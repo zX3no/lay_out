@@ -82,6 +82,7 @@ macro_rules! tlayout {
     (($widget:expr),*) => {};
 }
 
+//This does centers all widgets horizontally.
 #[macro_export]
 macro_rules! layout {
     ($($widget:expr),*) => {{
@@ -212,6 +213,7 @@ macro_rules! layout {
             //Click the widget once the layout is calculated.
             w.click(area);
 
+            //This is where the draw call would typically be issued.
             test.push((area, w.primative()));
             x += spacing + area.width;
 
