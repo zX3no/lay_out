@@ -34,7 +34,8 @@ where
     fn area(&self) -> Rect;
     fn area_mut(&mut self) -> &mut Rect;
     fn primative(&self) -> Primative;
-    fn click(&mut self) {}
+    //TODO: The area might go unused with the new macro and could be removed.
+    fn click(&mut self, area: Rect) {}
     fn on_click<F: FnMut(&mut Self)>(self, button: Button, click_fn: F) -> Click<Self, F>
     where
         Self: Sized,
@@ -74,6 +75,12 @@ macro_rules! count_expr {
 
 pub static mut VIEWPORT_WIDTH: usize = 800;
 pub static mut VIEWPORT_HEIGHT: usize = 600;
+
+//Does not take in references.
+#[macro_export]
+macro_rules! tlayout {
+    (($widget:expr),*) => {};
+}
 
 #[macro_export]
 macro_rules! layout {
@@ -127,6 +134,7 @@ macro_rules! layout {
                 total_height_of_largest += max_height;
                 max_height = 0;
                 total_width = 0;
+                widget_count = 0;
                 max_width = 0;
             }
 
@@ -160,6 +168,7 @@ macro_rules! layout {
             }
         )*
 
+        // dbg!(&segments);
         let mut vspacing =
             viewport_height.saturating_sub(total_height_of_largest) / (total_hsegments + 1);
         let mut x = 0;
@@ -176,12 +185,14 @@ macro_rules! layout {
                 x = spacing;
             }
 
-            if wid > segment.widget_count {
+            if wid >= segment.widget_count {
                 wid = 0;
                 seg += 1;
                 y += max_height + vspacing;
+
                 segment = &segments[seg];
                 spacing = viewport_width.saturating_sub(segment.size) / (segment.widget_count + 1);
+                x = spacing;
             }
 
             let w = widget(&mut $widget);
@@ -199,7 +210,7 @@ macro_rules! layout {
             let area = w.area();
 
             //Click the widget once the layout is calculated.
-            w.click();
+            w.click(area);
 
             test.push((area, w.primative()));
             x += spacing + area.width;

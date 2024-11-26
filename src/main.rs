@@ -43,7 +43,32 @@ fn main() {
     }
 
     let test = layout!(header, header2);
-    assert!(test.len() == 2);
-    assert!(test[0].0.x == 0);
-    assert!(test[1].0.x == 20);
+    assert_eq!(test.len(), 2);
+    assert_eq!(test[0].0.x, 0);
+    assert_eq!(test[1].0.x, 20);
+
+    let mut header3 = Header {
+        title: "hi",
+        area: Rect { x: 0, y: 0, width: 20, height: 20 },
+    };
+
+    let test = layout!(header, header2, header3);
+    assert_eq!(test.len(), 3);
+    assert_eq!(test[0].0.x, 0);
+    assert_eq!(test[1].0.x, 20);
+    //Middle is (40 / 2) - ((40 / 2) / 2) = 10
+    assert_eq!(test[2].0.x, 10);
+
+    let mut header4 = Header {
+        title: "hi",
+        area: Rect { x: 0, y: 0, width: 20, height: 20 },
+    };
+
+    let test = layout!(header, header2, header3, header4);
+
+    assert_eq!(test.len(), 4);
+    assert_eq!(test[0].0.x, 0);
+    assert_eq!(test[1].0.x, 20);
+    assert_eq!(test[2].0.x, 0);
+    assert_eq!(test[3].0.x, 20);
 }
