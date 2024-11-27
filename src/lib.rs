@@ -1,4 +1,5 @@
 #![feature(associated_type_defaults)]
+#![allow(unused_assignments)]
 
 //An example widget for testing.
 #[derive(Clone, Debug)]
@@ -61,7 +62,7 @@ where
     fn area_mut(&mut self) -> &mut Rect;
     fn primative(&self) -> Primative;
     //TODO: The area might go unused with the new macro and could be removed.
-    fn click(&mut self, area: Rect) {}
+    fn click(&mut self, _area: Rect) {}
     fn on_click<F: FnMut(&mut Self)>(self, button: Button, click_fn: F) -> Click<Self, F>
     where
         Self: Sized,
@@ -132,8 +133,8 @@ macro_rules! layout {
         let mut total_hsegments = 0;
 
         let mut max_height = 0;
-        let horizontal_wrap = 0;
-        let vertical_wrap = 0;
+        // let horizontal_wrap = 0;
+        // let vertical_wrap = 0;
 
         // let count = widgets.len();
         let count = count_expr!($($widget),*);
@@ -323,14 +324,19 @@ macro_rules! flex {
     ($flex:expr, $($widget:expr),*) => {{
         let mut test = Vec::new();
 
-        let mut viewport_width = unsafe { VIEWPORT_WIDTH };
-        let mut viewport_height = unsafe { VIEWPORT_HEIGHT };
+        let viewport_width = unsafe { VIEWPORT_WIDTH };
+        //TODO: Would be used with vertical flex
+        // let viewport_height = unsafe { VIEWPORT_HEIGHT };
 
         let flex: Flex = $flex;
 
-        let (mut x, mut y) = flex_xy(flex, 0, 0);
-        let mut start_x = x;
-        let mut start_y = y;
+        let _x = 0;
+        let _y = 0;
+        let (mut x, mut y) = flex_xy(flex, _x, _y);
+        let start_x = x;
+
+        //TODO: Would be used with vertical flex
+        // let start_y = y;
 
         let mut largest_widget = 0;
 
@@ -341,25 +347,22 @@ macro_rules! flex {
             if match flex {
                 Flex::TopLeft => (x + area.width) >= viewport_width,
                 Flex::TopRight => x.checked_sub(area.width).is_none(),
-                Flex::BottomLeft => todo!(),
-                Flex::BottomRight => todo!(),
+                _ => false,
             } {
                 x = start_x;
                 y += largest_widget;
                 largest_widget = 0;
             }
 
-            // if flex == Flex::TopLeft && (x + area.width) >= viewport_width{
-            //     x = start_x;
-            //     y += largest_widget;
-            //     largest_widget = 0;
-            // }
-
-            // if flex == Flex::TopRight && x.checked_sub(area.width).is_none() {
-            //     x = start_x;
-            //     y += largest_widget;
-            //     largest_widget = 0;
-            // }
+            if match flex {
+                Flex::BottomLeft => (x + area.width) >= viewport_width,
+                Flex::BottomRight => x.checked_sub(area.width).is_none(),
+                _ => false,
+            } {
+                x = start_x;
+                y -= largest_widget;
+                largest_widget = 0;
+            }
 
             if area.height > largest_widget {
                 largest_widget = area.height;
@@ -378,10 +381,8 @@ macro_rules! flex {
             test.push((area, w.primative()));
 
             match flex {
-                Flex::TopLeft => x += area.width,
-                Flex::TopRight => x -= area.width,
-                Flex::BottomLeft => todo!(),
-                Flex::BottomRight => todo!(),
+                Flex::TopLeft | Flex::BottomLeft => x += area.width,
+                Flex::TopRight | Flex::BottomRight => x -= area.width,
             };
         )*
 
@@ -452,8 +453,8 @@ pub fn flex(viewport_width: usize, viewport_height: usize, widgets: &[(Rect, Pri
     let mut total_hsegments = 0;
 
     let mut max_height = 0;
-    let horizontal_wrap = 0;
-    let vertical_wrap = 0;
+    // let horizontal_wrap = 0;
+    // let vertical_wrap = 0;
 
     let mut segment_widgets = Vec::new();
     let count = widgets.len();
@@ -540,6 +541,72 @@ pub fn flex(viewport_width: usize, viewport_height: usize, widgets: &[(Rect, Pri
 #[cfg(test)]
 mod tests {
     use crate::*;
+
+    #[test]
+    fn flex() {
+        let mut h = Header {
+            title: "hi",
+            area: Rect { x: 0, y: 0, width: 20, height: 20 },
+        };
+
+        let mut h2 = Header {
+            title: "hi",
+            area: Rect { x: 0, y: 0, width: 20, height: 20 },
+        };
+
+        let mut h3 = Header {
+            title: "hi",
+            area: Rect { x: 0, y: 0, width: 20, height: 20 },
+        };
+
+        unsafe {
+            VIEWPORT_HEIGHT = 40;
+            VIEWPORT_WIDTH = 50;
+        }
+
+        let test = flex!(Flex::TopLeft, h, h2, h3);
+
+        assert_eq!(test[0].0.x, 0);
+        assert_eq!(test[0].0.y, 0);
+
+        assert_eq!(test[1].0.x, 20);
+        assert_eq!(test[1].0.y, 0);
+
+        assert_eq!(test[2].0.x, 0);
+        assert_eq!(test[2].0.y, 20);
+
+        let test = flex!(Flex::TopRight, h, h2, h3);
+        assert_eq!(test[0].0.x, 50);
+        assert_eq!(test[0].0.y, 0);
+
+        assert_eq!(test[1].0.x, 30);
+        assert_eq!(test[0].0.y, 0);
+
+        assert_eq!(test[2].0.x, 50);
+        assert_eq!(test[2].0.y, 20);
+
+        let test = flex!(Flex::BottomLeft, h, h2, h3);
+
+        assert_eq!(test[0].0.x, 0);
+        assert_eq!(test[0].0.y, 40);
+
+        assert_eq!(test[1].0.x, 20);
+        assert_eq!(test[0].0.y, 40);
+
+        assert_eq!(test[2].0.x, 0);
+        assert_eq!(test[2].0.y, 20);
+
+        let test = flex!(Flex::BottomRight, h, h2, h3);
+
+        assert_eq!(test[0].0.x, 50);
+        assert_eq!(test[0].0.y, 40);
+
+        assert_eq!(test[1].0.x, 30);
+        assert_eq!(test[0].0.y, 40);
+
+        assert_eq!(test[2].0.x, 50);
+        assert_eq!(test[2].0.y, 20);
+    }
 
     #[test]
     fn hcenter() {
