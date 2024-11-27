@@ -1,5 +1,5 @@
 #![feature(associated_type_defaults)]
-#![allow(unused_assignments)]
+#![allow(unused_assignments, static_mut_refs)]
 
 //An example widget for testing.
 #[derive(Clone, Debug)]
@@ -100,9 +100,6 @@ macro_rules! count_expr {
     };
 }
 
-pub static mut VIEWPORT_WIDTH: usize = 800;
-pub static mut VIEWPORT_HEIGHT: usize = 600;
-
 //Does not take in references.
 #[macro_export]
 macro_rules! tlayout {
@@ -112,7 +109,7 @@ macro_rules! tlayout {
 //This does centers all widgets horizontally.
 #[macro_export]
 macro_rules! layout {
-    ($($widget:expr),*) => {{
+    ($vw:expr, $vh:expr, $($widget:expr),*) => {{
         // let mut widgets = Vec::new();
 
         // $(
@@ -123,8 +120,8 @@ macro_rules! layout {
         let mut test = Vec::new();
 
         let mut segments: Vec<Segment> = Vec::new();
-        let viewport_width: usize = unsafe {VIEWPORT_WIDTH};
-        let viewport_height: usize = unsafe {VIEWPORT_HEIGHT};
+        let viewport_width: usize = $vw;
+        let viewport_height: usize = $vh;
         let mut total_width = 0;
         let mut max_width = 0;
 
@@ -307,10 +304,7 @@ pub enum Flex {
     BottomRight,
 }
 
-pub const fn flex_xy(start: Flex, x: usize, y: usize) -> (usize, usize) {
-    let viewport_width = unsafe { VIEWPORT_WIDTH };
-    let viewport_height = unsafe { VIEWPORT_HEIGHT };
-
+pub fn flex_xy(start: Flex, viewport_width: usize, viewport_height: usize, x: usize, y: usize) -> (usize, usize) {
     match start {
         Flex::TopLeft => (x, y),
         Flex::TopRight => (viewport_width - x, y),
@@ -321,51 +315,80 @@ pub const fn flex_xy(start: Flex, x: usize, y: usize) -> (usize, usize) {
 
 #[macro_export]
 macro_rules! flex {
-    ($flex:expr, $($widget:expr),*) => {{
+    ($flex:expr, $direction:expr, $vw:expr, $vh:expr, $($widget:expr),*) => {{
         let mut test = Vec::new();
 
-        let viewport_width = unsafe { VIEWPORT_WIDTH };
-        //TODO: Would be used with vertical flex
-        // let viewport_height = unsafe { VIEWPORT_HEIGHT };
+        let viewport_width: usize = $vw;
+        let viewport_height: usize = $vh;
 
         let flex: Flex = $flex;
+        let direction: Direction = $direction;
 
         let _x = 0;
         let _y = 0;
-        let (mut x, mut y) = flex_xy(flex, _x, _y);
+        let (mut x, mut y) = flex_xy(flex, viewport_width, viewport_height, _x, _y);
         let start_x = x;
+        let start_y = y;
 
-        //TODO: Would be used with vertical flex
-        // let start_y = y;
-
-        let mut largest_widget = 0;
+        let mut max_height = 0;
+        let mut max_width = 0;
 
         $(
             let w = widget(&mut $widget);
             let area = w.area_mut();
 
-            if match flex {
-                Flex::TopLeft => (x + area.width) >= viewport_width,
-                Flex::TopRight => x.checked_sub(area.width).is_none(),
-                _ => false,
-            } {
-                x = start_x;
-                y += largest_widget;
-                largest_widget = 0;
+            match direction {
+                Direction::Horizontal => {
+                    if match flex {
+                        Flex::TopLeft => (x + area.width) >= viewport_width,
+                        Flex::TopRight => x.checked_sub(area.width).is_none(),
+                        _ => false,
+                    } {
+                        x = start_x;
+                        y += max_height;
+                        max_height = 0;
+                    }
+
+                    if match flex {
+                        Flex::BottomLeft => (x + area.width) >= viewport_width,
+                        Flex::BottomRight => x.checked_sub(area.width).is_none(),
+                        _ => false,
+                    } {
+                        x = start_x;
+                        y -= max_height;
+                        max_height = 0;
+                    }
+
+                }
+                Direction::Vertical => {
+                    if match flex {
+                        Flex::TopLeft => (y + area.height) >= viewport_height,
+                        Flex::BottomLeft => y.checked_sub(area.height).is_none(),
+                        _ => false,
+                    } {
+                        y = start_y;
+                        x += max_width;
+                        max_width = 0;
+                    }
+
+                    if match flex {
+                        Flex::TopRight => (y + area.height) >= viewport_height,
+                        Flex::BottomRight => y.checked_sub(area.height).is_none(),
+                        _ => false,
+                    } {
+                        y = start_y;
+                        x -= max_width;
+                        max_width = 0;
+                    }
+                }
             }
 
-            if match flex {
-                Flex::BottomLeft => (x + area.width) >= viewport_width,
-                Flex::BottomRight => x.checked_sub(area.width).is_none(),
-                _ => false,
-            } {
-                x = start_x;
-                y -= largest_widget;
-                largest_widget = 0;
+            if area.height > max_height {
+                max_height = area.height;
             }
 
-            if area.height > largest_widget {
-                largest_widget = area.height;
+            if area.width > max_width {
+                max_width = area.width;
             }
 
             area.x = x;
@@ -380,10 +403,20 @@ macro_rules! flex {
             //This is where the draw call would typically be issued.
             test.push((area, w.primative()));
 
-            match flex {
-                Flex::TopLeft | Flex::BottomLeft => x += area.width,
-                Flex::TopRight | Flex::BottomRight => x -= area.width,
-            };
+            match direction {
+                Direction::Horizontal => {
+                    match flex {
+                        Flex::TopLeft | Flex::BottomLeft => x += area.width,
+                        Flex::TopRight | Flex::BottomRight => x -= area.width,
+                    };
+                }
+                Direction::Vertical =>  {
+                    match flex {
+                        Flex::TopLeft | Flex::TopRight => y += area.height,
+                        Flex::BottomLeft | Flex::BottomRight => y -= area.height,
+                    };
+                }
+            }
         )*
 
         test
@@ -543,7 +576,7 @@ mod tests {
     use crate::*;
 
     #[test]
-    fn flex() {
+    fn flex_horizontal() {
         let mut h = Header {
             title: "hi",
             area: Rect { x: 0, y: 0, width: 20, height: 20 },
@@ -559,12 +592,11 @@ mod tests {
             area: Rect { x: 0, y: 0, width: 20, height: 20 },
         };
 
-        unsafe {
-            VIEWPORT_HEIGHT = 40;
-            VIEWPORT_WIDTH = 50;
-        }
+        //viewport width and height.
+        let vw = 50;
+        let vh = 40;
 
-        let test = flex!(Flex::TopLeft, h, h2, h3);
+        let test = flex!(Flex::TopLeft, Direction::Horizontal, vw, vh, h, h2, h3);
 
         assert_eq!(test[0].0.x, 0);
         assert_eq!(test[0].0.y, 0);
@@ -575,7 +607,7 @@ mod tests {
         assert_eq!(test[2].0.x, 0);
         assert_eq!(test[2].0.y, 20);
 
-        let test = flex!(Flex::TopRight, h, h2, h3);
+        let test = flex!(Flex::TopRight, Direction::Horizontal, vw, vh, h, h2, h3);
         assert_eq!(test[0].0.x, 50);
         assert_eq!(test[0].0.y, 0);
 
@@ -585,7 +617,7 @@ mod tests {
         assert_eq!(test[2].0.x, 50);
         assert_eq!(test[2].0.y, 20);
 
-        let test = flex!(Flex::BottomLeft, h, h2, h3);
+        let test = flex!(Flex::BottomLeft, Direction::Horizontal, vw, vh, h, h2, h3);
 
         assert_eq!(test[0].0.x, 0);
         assert_eq!(test[0].0.y, 40);
@@ -596,7 +628,7 @@ mod tests {
         assert_eq!(test[2].0.x, 0);
         assert_eq!(test[2].0.y, 20);
 
-        let test = flex!(Flex::BottomRight, h, h2, h3);
+        let test = flex!(Flex::BottomRight, Direction::Horizontal, vw, vh, h, h2, h3);
 
         assert_eq!(test[0].0.x, 50);
         assert_eq!(test[0].0.y, 40);
@@ -609,7 +641,76 @@ mod tests {
     }
 
     #[test]
+    fn flex_vertical() {
+        let mut h = Header {
+            title: "hi",
+            area: Rect { x: 0, y: 0, width: 20, height: 20 },
+        };
+
+        let mut h2 = Header {
+            title: "hi",
+            area: Rect { x: 0, y: 0, width: 20, height: 20 },
+        };
+
+        let mut h3 = Header {
+            title: "hi",
+            area: Rect { x: 0, y: 0, width: 20, height: 20 },
+        };
+
+        //viewport width and height.
+        let vw = 50;
+        let vh = 50;
+
+        let test = flex!(Flex::TopLeft, Direction::Vertical, vw, vh, h, h2, h3);
+
+        assert_eq!(test[0].0.x, 0);
+        assert_eq!(test[0].0.y, 0);
+
+        assert_eq!(test[1].0.x, 0);
+        assert_eq!(test[1].0.y, 20);
+
+        assert_eq!(test[2].0.x, 20);
+        assert_eq!(test[2].0.y, 0);
+
+        let test = flex!(Flex::TopRight, Direction::Vertical, vw, vh, h, h2, h3);
+
+        assert_eq!(test[0].0.x, 50);
+        assert_eq!(test[0].0.y, 0);
+
+        assert_eq!(test[1].0.x, 50);
+        assert_eq!(test[1].0.y, 20);
+
+        assert_eq!(test[2].0.x, 30);
+        assert_eq!(test[2].0.y, 0);
+
+        let test = flex!(Flex::BottomLeft, Direction::Vertical, vw, vh, h, h2, h3);
+
+        assert_eq!(test[0].0.x, 0);
+        assert_eq!(test[0].0.y, 50);
+
+        assert_eq!(test[1].0.x, 0);
+        assert_eq!(test[1].0.y, 30);
+
+        assert_eq!(test[2].0.x, 20);
+        assert_eq!(test[2].0.y, 50);
+
+        let test = flex!(Flex::BottomRight, Direction::Vertical, vw, vh, h, h2, h3);
+
+        assert_eq!(test[0].0.x, 50);
+        assert_eq!(test[0].0.y, 50);
+
+        assert_eq!(test[1].0.x, 50);
+        assert_eq!(test[1].0.y, 30);
+
+        assert_eq!(test[2].0.x, 30);
+        assert_eq!(test[2].0.y, 50);
+    }
+
+    #[test]
     fn hcenter() {
+        let vw = 40;
+        let vh = 40;
+
         let mut header = Header {
             title: "hi",
             area: Rect { x: 0, y: 0, width: 20, height: 20 },
@@ -620,12 +721,7 @@ mod tests {
             area: Rect { x: 0, y: 0, width: 20, height: 20 },
         };
 
-        unsafe {
-            VIEWPORT_HEIGHT = 20;
-            VIEWPORT_WIDTH = 40;
-        }
-
-        let test = layout!(header, header2);
+        let test = layout!(vw, vh, header, header2);
         assert_eq!(test.len(), 2);
         assert_eq!(test[0].0.x, 0);
         assert_eq!(test[1].0.x, 20);
@@ -635,7 +731,7 @@ mod tests {
             area: Rect { x: 0, y: 0, width: 20, height: 20 },
         };
 
-        let test = layout!(header, header2, header3);
+        let test = layout!(vw, vh, header, header2, header3);
         assert_eq!(test.len(), 3);
         assert_eq!(test[0].0.x, 0);
         assert_eq!(test[1].0.x, 20);
@@ -647,7 +743,7 @@ mod tests {
             area: Rect { x: 0, y: 0, width: 20, height: 20 },
         };
 
-        let test = layout!(header, header2, header3, header4);
+        let test = layout!(vw, vh, header, header2, header3, header4);
 
         assert_eq!(test.len(), 4);
         assert_eq!(test[0].0.x, 0);
