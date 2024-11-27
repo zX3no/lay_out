@@ -358,7 +358,6 @@ macro_rules! flex {
                         y -= max_height;
                         max_height = 0;
                     }
-
                 }
                 Direction::Vertical => {
                     if match flex {
