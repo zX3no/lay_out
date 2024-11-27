@@ -247,55 +247,6 @@ macro_rules! layout {
     }};
 }
 
-#[macro_export]
-macro_rules! flex_top_left {
-    ($($widget:expr),*) => {{
-        let mut test = Vec::new();
-
-        let mut viewport_width = unsafe { VIEWPORT_WIDTH };
-        let mut viewport_height = unsafe { VIEWPORT_HEIGHT };
-
-        //User should be able to configure these.
-        let start_x = 0;
-        let start_y = 0;
-        let (mut x, mut y) = flex_xy(Flex::TopLeft, start_x, start_y);
-
-        let mut largest_widget = 0;
-
-        $(
-            let w = widget(&mut $widget);
-            let area = w.area_mut();
-
-            //Widget is too wide
-            if (x + area.width) >= viewport_width {
-                x = start_x;
-                y += largest_widget;
-                largest_widget = 0;
-            }
-
-            if area.height > largest_widget {
-                largest_widget = area.height;
-            }
-
-            area.x = x;
-            area.y = y;
-
-            //Stop the mutable borrow.
-            let area = w.area();
-
-            //Click the widget once the layout is calculated.
-            w.click(area);
-
-            //This is where the draw call would typically be issued.
-            test.push((area, w.primative()));
-
-            x += area.width;
-        )*
-
-        test
-    }};
-}
-
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Flex {
     TopLeft,
