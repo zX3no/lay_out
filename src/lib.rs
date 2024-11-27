@@ -18,11 +18,14 @@ impl Widget for Header {
     }
 
     fn on_click<F: FnMut(&mut Self)>(self, button: Button, f: F) -> Click<Self, F> {
-        Click { widget: self, click: (button, f) }
+        Click {
+            widget: self,
+            click: (button, f),
+        }
     }
 
-    fn area_mut(&mut self) -> &mut Rect {
-        &mut self.area
+    fn area_mut(&mut self) -> Option<&mut Rect> {
+        Some(&mut self.area)
     }
 }
 
@@ -59,10 +62,10 @@ where
     type Layout = Self;
 
     fn area(&self) -> Rect;
-    fn area_mut(&mut self) -> &mut Rect;
+    fn area_mut(&mut self) -> Option<&mut Rect>;
     fn primative(&self) -> Primative;
-    //TODO: The area might go unused with the new macro and could be removed.
-    fn click(&mut self, _area: Rect) {}
+    // fn try_click(&mut self, area: Rect) {}
+    fn try_click(&mut self) {}
     fn on_click<F: FnMut(&mut Self)>(self, button: Button, click_fn: F) -> Click<Self, F>
     where
         Self: Sized,
@@ -221,7 +224,7 @@ macro_rules! layout {
 
             let w = widget(&mut $widget);
 
-            let area = w.area_mut();
+            let area = w.area_mut().unwrap();
 
             if area.height > max_height {
                 max_height = area.height;
@@ -234,7 +237,7 @@ macro_rules! layout {
             let area = w.area();
 
             //Click the widget once the layout is calculated.
-            w.click(area);
+            // w.try_click(area);
 
             //This is where the draw call would typically be issued.
             test.push((area, w.primative()));
@@ -255,7 +258,13 @@ pub enum Flex {
     BottomRight,
 }
 
-pub fn flex_xy(start: Flex, viewport_width: usize, viewport_height: usize, x: usize, y: usize) -> (usize, usize) {
+pub fn flex_xy(
+    start: Flex,
+    viewport_width: usize,
+    viewport_height: usize,
+    x: usize,
+    y: usize,
+) -> (usize, usize) {
     match start {
         Flex::TopLeft => (x, y),
         Flex::TopRight => (viewport_width - x, y),
@@ -286,7 +295,7 @@ macro_rules! flex {
 
         $(
             let w = widget(&mut $widget);
-            let area = w.area_mut();
+            let area = w.area_mut().unwrap();
 
             match direction {
                 Direction::Horizontal => {
@@ -348,7 +357,7 @@ macro_rules! flex {
             let area = w.area();
 
             //Click the widget once the layout is calculated.
-            w.click(area);
+            w.try_click();
 
             //This is where the draw call would typically be issued.
             test.push((area, w.primative()));
@@ -423,7 +432,11 @@ pub struct OldSegment {
     pub widgets: Vec<(Rect, Primative)>,
 }
 
-pub fn flex(viewport_width: usize, viewport_height: usize, widgets: &[(Rect, Primative)]) -> Vec<(Rect, Primative)> {
+pub fn flex(
+    viewport_width: usize,
+    viewport_height: usize,
+    widgets: &[(Rect, Primative)],
+) -> Vec<(Rect, Primative)> {
     let mut temp_primatives = Vec::new();
     let mut segments: Vec<OldSegment> = Vec::new();
     // let viewport_width = ctx().area.width;
@@ -529,17 +542,32 @@ mod tests {
     fn flex_horizontal() {
         let mut h = Header {
             title: "hi",
-            area: Rect { x: 0, y: 0, width: 20, height: 20 },
+            area: Rect {
+                x: 0,
+                y: 0,
+                width: 20,
+                height: 20,
+            },
         };
 
         let mut h2 = Header {
             title: "hi",
-            area: Rect { x: 0, y: 0, width: 20, height: 20 },
+            area: Rect {
+                x: 0,
+                y: 0,
+                width: 20,
+                height: 20,
+            },
         };
 
         let mut h3 = Header {
             title: "hi",
-            area: Rect { x: 0, y: 0, width: 20, height: 20 },
+            area: Rect {
+                x: 0,
+                y: 0,
+                width: 20,
+                height: 20,
+            },
         };
 
         //viewport width and height.
@@ -594,17 +622,32 @@ mod tests {
     fn flex_vertical() {
         let mut h = Header {
             title: "hi",
-            area: Rect { x: 0, y: 0, width: 20, height: 20 },
+            area: Rect {
+                x: 0,
+                y: 0,
+                width: 20,
+                height: 20,
+            },
         };
 
         let mut h2 = Header {
             title: "hi",
-            area: Rect { x: 0, y: 0, width: 20, height: 20 },
+            area: Rect {
+                x: 0,
+                y: 0,
+                width: 20,
+                height: 20,
+            },
         };
 
         let mut h3 = Header {
             title: "hi",
-            area: Rect { x: 0, y: 0, width: 20, height: 20 },
+            area: Rect {
+                x: 0,
+                y: 0,
+                width: 20,
+                height: 20,
+            },
         };
 
         //viewport width and height.
@@ -663,12 +706,22 @@ mod tests {
 
         let mut header = Header {
             title: "hi",
-            area: Rect { x: 0, y: 0, width: 20, height: 20 },
+            area: Rect {
+                x: 0,
+                y: 0,
+                width: 20,
+                height: 20,
+            },
         };
 
         let mut header2 = Header {
             title: "hi",
-            area: Rect { x: 0, y: 0, width: 20, height: 20 },
+            area: Rect {
+                x: 0,
+                y: 0,
+                width: 20,
+                height: 20,
+            },
         };
 
         let test = layout!(vw, vh, header, header2);
@@ -678,7 +731,12 @@ mod tests {
 
         let mut header3 = Header {
             title: "hi",
-            area: Rect { x: 0, y: 0, width: 20, height: 20 },
+            area: Rect {
+                x: 0,
+                y: 0,
+                width: 20,
+                height: 20,
+            },
         };
 
         let test = layout!(vw, vh, header, header2, header3);
@@ -690,7 +748,12 @@ mod tests {
 
         let mut header4 = Header {
             title: "hi",
-            area: Rect { x: 0, y: 0, width: 20, height: 20 },
+            area: Rect {
+                x: 0,
+                y: 0,
+                width: 20,
+                height: 20,
+            },
         };
 
         let test = layout!(vw, vh, header, header2, header3, header4);
