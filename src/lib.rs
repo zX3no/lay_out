@@ -1,4 +1,30 @@
 #![feature(associated_type_defaults)]
+
+//An example widget for testing.
+#[derive(Clone, Debug)]
+pub struct Header {
+    pub title: &'static str,
+    pub area: Rect,
+}
+
+impl Widget for Header {
+    fn area(&self) -> Rect {
+        self.area
+    }
+
+    fn primative(&self) -> Primative {
+        Primative::Text
+    }
+
+    fn on_click<F: FnMut(&mut Self)>(self, button: Button, f: F) -> Click<Self, F> {
+        Click { widget: self, click: (button, f) }
+    }
+
+    fn area_mut(&mut self) -> &mut Rect {
+        &mut self.area
+    }
+}
+
 #[derive(Copy, Clone, Debug, Default)]
 pub struct Rect {
     pub x: usize,
@@ -96,8 +122,8 @@ macro_rules! layout {
         let mut test = Vec::new();
 
         let mut segments: Vec<Segment> = Vec::new();
-        let mut viewport_width: usize = unsafe {VIEWPORT_WIDTH};
-        let mut viewport_height: usize = unsafe {VIEWPORT_HEIGHT};
+        let viewport_width: usize = unsafe {VIEWPORT_WIDTH};
+        let viewport_height: usize = unsafe {VIEWPORT_HEIGHT};
         let mut total_width = 0;
         let mut max_width = 0;
 
@@ -106,8 +132,8 @@ macro_rules! layout {
         let mut total_hsegments = 0;
 
         let mut max_height = 0;
-        let mut horizontal_wrap = 0;
-        let mut vertical_wrap = 0;
+        let horizontal_wrap = 0;
+        let vertical_wrap = 0;
 
         // let count = widgets.len();
         let count = count_expr!($($widget),*);
@@ -117,7 +143,6 @@ macro_rules! layout {
 
         $(
             let area = $widget.area();
-            let primative = $widget.primative();
 
             i += 1;
 
@@ -170,7 +195,7 @@ macro_rules! layout {
         )*
 
         // dbg!(&segments);
-        let mut vspacing =
+        let vspacing =
             viewport_height.saturating_sub(total_height_of_largest) / (total_hsegments + 1);
         let mut x = 0;
         let mut y = vspacing;
@@ -218,6 +243,146 @@ macro_rules! layout {
             x += spacing + area.width;
 
             wid += 1;
+        )*
+
+        test
+    }};
+}
+
+#[macro_export]
+macro_rules! flex_top_left {
+    ($($widget:expr),*) => {{
+        let mut test = Vec::new();
+
+        let mut viewport_width = unsafe { VIEWPORT_WIDTH };
+        let mut viewport_height = unsafe { VIEWPORT_HEIGHT };
+
+        //User should be able to configure these.
+        let start_x = 0;
+        let start_y = 0;
+        let (mut x, mut y) = flex_xy(Flex::TopLeft, start_x, start_y);
+
+        let mut largest_widget = 0;
+
+        $(
+            let w = widget(&mut $widget);
+            let area = w.area_mut();
+
+            //Widget is too wide
+            if (x + area.width) >= viewport_width {
+                x = start_x;
+                y += largest_widget;
+                largest_widget = 0;
+            }
+
+            if area.height > largest_widget {
+                largest_widget = area.height;
+            }
+
+            area.x = x;
+            area.y = y;
+
+            //Stop the mutable borrow.
+            let area = w.area();
+
+            //Click the widget once the layout is calculated.
+            w.click(area);
+
+            //This is where the draw call would typically be issued.
+            test.push((area, w.primative()));
+
+            x += area.width;
+        )*
+
+        test
+    }};
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum Flex {
+    TopLeft,
+    TopRight,
+    BottomLeft,
+    BottomRight,
+}
+
+pub const fn flex_xy(start: Flex, x: usize, y: usize) -> (usize, usize) {
+    let viewport_width = unsafe { VIEWPORT_WIDTH };
+    let viewport_height = unsafe { VIEWPORT_HEIGHT };
+
+    match start {
+        Flex::TopLeft => (x, y),
+        Flex::TopRight => (viewport_width - x, y),
+        Flex::BottomLeft => (x, viewport_height - y),
+        Flex::BottomRight => (viewport_width - x, viewport_height - y),
+    }
+}
+
+#[macro_export]
+macro_rules! flex {
+    ($flex:expr, $($widget:expr),*) => {{
+        let mut test = Vec::new();
+
+        let mut viewport_width = unsafe { VIEWPORT_WIDTH };
+        let mut viewport_height = unsafe { VIEWPORT_HEIGHT };
+
+        let flex: Flex = $flex;
+
+        let (mut x, mut y) = flex_xy(flex, 0, 0);
+        let mut start_x = x;
+        let mut start_y = y;
+
+        let mut largest_widget = 0;
+
+        $(
+            let w = widget(&mut $widget);
+            let area = w.area_mut();
+
+            if match flex {
+                Flex::TopLeft => (x + area.width) >= viewport_width,
+                Flex::TopRight => x.checked_sub(area.width).is_none(),
+                Flex::BottomLeft => todo!(),
+                Flex::BottomRight => todo!(),
+            } {
+                x = start_x;
+                y += largest_widget;
+                largest_widget = 0;
+            }
+
+            // if flex == Flex::TopLeft && (x + area.width) >= viewport_width{
+            //     x = start_x;
+            //     y += largest_widget;
+            //     largest_widget = 0;
+            // }
+
+            // if flex == Flex::TopRight && x.checked_sub(area.width).is_none() {
+            //     x = start_x;
+            //     y += largest_widget;
+            //     largest_widget = 0;
+            // }
+
+            if area.height > largest_widget {
+                largest_widget = area.height;
+            }
+
+            area.x = x;
+            area.y = y;
+
+            //Stop the mutable borrow.
+            let area = w.area();
+
+            //Click the widget once the layout is calculated.
+            w.click(area);
+
+            //This is where the draw call would typically be issued.
+            test.push((area, w.primative()));
+
+            match flex {
+                Flex::TopLeft => x += area.width,
+                Flex::TopRight => x -= area.width,
+                Flex::BottomLeft => todo!(),
+                Flex::BottomRight => todo!(),
+            };
         )*
 
         test
@@ -370,4 +535,57 @@ pub fn flex(viewport_width: usize, viewport_height: usize, widgets: &[(Rect, Pri
     }
 
     temp_primatives
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::*;
+
+    #[test]
+    fn hcenter() {
+        let mut header = Header {
+            title: "hi",
+            area: Rect { x: 0, y: 0, width: 20, height: 20 },
+        };
+
+        let mut header2 = Header {
+            title: "hi",
+            area: Rect { x: 0, y: 0, width: 20, height: 20 },
+        };
+
+        unsafe {
+            VIEWPORT_HEIGHT = 20;
+            VIEWPORT_WIDTH = 40;
+        }
+
+        let test = layout!(header, header2);
+        assert_eq!(test.len(), 2);
+        assert_eq!(test[0].0.x, 0);
+        assert_eq!(test[1].0.x, 20);
+
+        let mut header3 = Header {
+            title: "hi",
+            area: Rect { x: 0, y: 0, width: 20, height: 20 },
+        };
+
+        let test = layout!(header, header2, header3);
+        assert_eq!(test.len(), 3);
+        assert_eq!(test[0].0.x, 0);
+        assert_eq!(test[1].0.x, 20);
+        //Middle is (40 / 2) - ((40 / 2) / 2) = 10
+        assert_eq!(test[2].0.x, 10);
+
+        let mut header4 = Header {
+            title: "hi",
+            area: Rect { x: 0, y: 0, width: 20, height: 20 },
+        };
+
+        let test = layout!(header, header2, header3, header4);
+
+        assert_eq!(test.len(), 4);
+        assert_eq!(test[0].0.x, 0);
+        assert_eq!(test[1].0.x, 20);
+        assert_eq!(test[2].0.x, 0);
+        assert_eq!(test[3].0.x, 20);
+    }
 }
