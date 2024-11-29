@@ -210,14 +210,17 @@ macro_rules! flex_center {
                     }
                 },
                 Center::Both => {
+                    todo!()
                 }
             };
         )*
 
+        //This is named poorly, I honestly can't even remember what this is for...
         let vspacing = viewport_height.saturating_sub(total_height_of_largest) / segments.len();
         let hspacing = viewport_width.saturating_sub(total_width_of_largest) / segments.len();
         // dbg!(vspacing, hspacing, viewport_width, total_width_of_largest, total_height_of_largest, &segments);
 
+        //Spacing is really the segment spacing.
         let (mut x, mut y, mut spacing) = match center {
             Center::Horizontal => {
                 let spacing = viewport_width.saturating_sub(segments[0].size) / (segments[0].widget_count + 1);
@@ -227,7 +230,12 @@ macro_rules! flex_center {
                 let spacing = viewport_height.saturating_sub(segments[0].size) / (segments[0].widget_count + 1);
                 (0, spacing, spacing)
             },
-            Center::Both => todo!(),
+            Center::Both => {
+                let x = viewport_width.saturating_sub(segments[0].size) / (segments[0].widget_count + 1);
+                let y = viewport_height.saturating_sub(segments[0].size) / (segments[0].widget_count + 1);
+                //I think I'll need to keep both types of segment spacing.
+                (x, y, 0)
+            },
         };
 
         let mut widget_index = 0;
@@ -267,7 +275,7 @@ macro_rules! flex_center {
             let area = w.area();
 
             //Click the widget once the layout is calculated.
-            // w.try_click(area);
+            w.try_click();
 
             //This is where the draw call would typically be issued.
             test.push((area, w.primative()));
@@ -423,10 +431,11 @@ pub struct Segment {
     ///Either the total height or width.
     ///Depends on the direction.
     pub size: usize,
-    ///Max width or max height
+    ///Max width or max height depends on direction.
     pub max: usize,
     pub widget_count: usize,
 }
+
 impl Segment {
     pub const fn new() -> Self {
         Self {
