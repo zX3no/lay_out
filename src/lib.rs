@@ -688,17 +688,32 @@ mod tests {
 
         let mut h1 = Header {
             title: "hi",
-            area: Rect { x: 0, y: 0, width: 20, height: 20 },
+            area: Rect {
+                x: 0,
+                y: 0,
+                width: 20,
+                height: 20,
+            },
         };
 
         let mut h2 = Header {
             title: "hi",
-            area: Rect { x: 0, y: 0, width: 20, height: 20 },
+            area: Rect {
+                x: 0,
+                y: 0,
+                width: 20,
+                height: 20,
+            },
         };
 
         let mut h3 = Header {
             title: "hi",
-            area: Rect { x: 0, y: 0, width: 20, height: 20 },
+            area: Rect {
+                x: 0,
+                y: 0,
+                width: 20,
+                height: 20,
+            },
         };
 
         let test = flex_center!(Center::Vertical, vw, vh, h1, h2, h3);
