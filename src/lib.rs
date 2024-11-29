@@ -258,7 +258,7 @@ macro_rules! flex_center {
 
             let w = widget(&mut $widget);
 
-            let area = w.area_mut();
+            let area = w.area_mut().unwrap();
 
             area.x = x;
             area.y = y;
