@@ -115,12 +115,13 @@ pub trait DrawFlex {
 
 impl<F> DrawFlex for FlexImpl<F>
 where
-    F: FnOnce(FlexMode, usize, usize, usize, usize, usize, usize) -> Vec<(Rect, Primative)>,
+    //I changed this to be FnMut for debug purposes. I don't know what issues this might cause.
+    F: FnMut(FlexMode, usize, usize, usize, usize, usize, usize) -> Vec<(Rect, Primative)>,
 {
     fn call(&mut self, flex: &mut Flex<Self>) {
-        if let Some(f) = self.f.take() {
+        if let Some(ref mut f) = self.f {
             flex.debug = (f)(
-                flex.flex,
+                flex.mode,
                 flex.viewport_width,
                 flex.viewport_height,
                 flex.area.x,
@@ -134,7 +135,7 @@ where
 
 pub struct Flex<F: DrawFlex> {
     pub f: Option<F>,
-    pub flex: FlexMode,
+    pub mode: FlexMode,
     pub area: Rect,
     ///Outer padding
     pub padding: usize,
@@ -147,9 +148,11 @@ pub struct Flex<F: DrawFlex> {
 
 impl<F: DrawFlex> Flex<F> {
     pub fn force_draw(&mut self) {
-        if let Some(mut f) = self.f.take() {
+        let mut f = self.f.take();
+        if let Some(f) = &mut f {
             f.call(self);
         }
+        self.f = f;
     }
 }
 
@@ -169,7 +172,7 @@ impl<F: DrawFlex> std::fmt::Debug for Flex<F> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Flex")
             .field("f", if self.f.is_some() { &"Some" } else { &"None" })
-            .field("flex", &self.flex)
+            .field("flex", &self.mode)
             .field("area", &self.area)
             .field("padding", &self.padding)
             .field("margin", &self.margin)
@@ -183,27 +186,26 @@ impl<F: DrawFlex> std::fmt::Debug for Flex<F> {
 #[macro_export]
 macro_rules! f {
     ($($widget:expr),*) => {{
-        let f = |flex: FlexMode, viewport_width: usize, viewport_height: usize, x: usize, y: usize, margin: usize, padding: usize| -> Vec<(Rect, Primative)> {
+        let f = |flex: FlexMode, viewport_width: usize, viewport_height: usize, x: usize, y: usize, _margin: usize, _padding: usize| -> Vec<(Rect, Primative)> {
             let mut temp = Vec::new();
 
             match flex {
                 FlexMode::Standard(direction, quadrant) => {
                     //Could pack all of this into a struct. It might be faster.
                     //Might check later.
-                    let _x = 0;
-                    let _y = 0;
-                    let (mut x, mut y) = flex_xy(quadrant, viewport_width, viewport_height, _x, _y);
+                    let (x, y) = flex_xy(quadrant, viewport_width, viewport_height, x, y);
                     let start_x = x;
                     let start_y = y;
-                    let mut max_height = 0;
-                    let mut max_width = 0;
+                    let max_height = 0;
+                    let max_width = 0;
 
                     $(
                         let w = widget(&mut $widget);
+                        #[allow(unused)]
                         let (x, y, max_width, max_height) = flex_basic(direction,quadrant, w, x, y, start_x, start_y, max_height, max_width, viewport_width, viewport_height, &mut temp);
                     )*
                 }
-                FlexMode::Center(center) => {
+                FlexMode::Center(_) => {
                     todo!();
                 }
             }
@@ -213,7 +215,7 @@ macro_rules! f {
 
         $crate::Flex {
             f: Some(FlexImpl { f: Some(f) }),
-            flex: FlexMode::default(),
+            mode: FlexMode::default(),
             area: Rect::default(),
             padding: 0,
             margin: 0,
@@ -685,6 +687,90 @@ impl Segment {
 #[cfg(test)]
 mod tests {
     use crate::*;
+
+    #[test]
+    fn flex_horizontal_new() {
+        let mut h1 = Header {
+            title: "hi",
+            area: Rect {
+                x: 0,
+                y: 0,
+                width: 20,
+                height: 20,
+            },
+        };
+
+        let mut h2 = Header {
+            title: "hi",
+            area: Rect {
+                x: 0,
+                y: 0,
+                width: 20,
+                height: 20,
+            },
+        };
+
+        let mut h3 = Header {
+            title: "hi",
+            area: Rect {
+                x: 0,
+                y: 0,
+                width: 20,
+                height: 20,
+            },
+        };
+
+        let mut flex = f!(h1, h2, h3);
+        flex.viewport_width = 50;
+        flex.viewport_height = 40;
+        flex.mode = FlexMode::Standard(Direction::Horizontal, Quadrant::TopLeft);
+        flex.force_draw();
+
+        assert_eq!(flex.debug[0].0.x, 0);
+        assert_eq!(flex.debug[0].0.y, 0);
+
+        assert_eq!(flex.debug[1].0.x, 20);
+        assert_eq!(flex.debug[1].0.y, 0);
+
+        assert_eq!(flex.debug[2].0.x, 0);
+        assert_eq!(flex.debug[2].0.y, 20);
+
+        flex.mode = FlexMode::Standard(Direction::Horizontal, Quadrant::TopRight);
+        flex.force_draw();
+
+        assert_eq!(flex.debug[0].0.x, 50);
+        assert_eq!(flex.debug[0].0.y, 0);
+
+        assert_eq!(flex.debug[1].0.x, 30);
+        assert_eq!(flex.debug[0].0.y, 0);
+
+        assert_eq!(flex.debug[2].0.x, 50);
+        assert_eq!(flex.debug[2].0.y, 20);
+
+        flex.mode = FlexMode::Standard(Direction::Horizontal, Quadrant::BottomLeft);
+        flex.force_draw();
+
+        assert_eq!(flex.debug[0].0.x, 0);
+        assert_eq!(flex.debug[0].0.y, 40);
+
+        assert_eq!(flex.debug[1].0.x, 20);
+        assert_eq!(flex.debug[0].0.y, 40);
+
+        assert_eq!(flex.debug[2].0.x, 0);
+        assert_eq!(flex.debug[2].0.y, 20);
+
+        flex.mode = FlexMode::Standard(Direction::Horizontal, Quadrant::BottomRight);
+        flex.force_draw();
+
+        assert_eq!(flex.debug[0].0.x, 50);
+        assert_eq!(flex.debug[0].0.y, 40);
+
+        assert_eq!(flex.debug[1].0.x, 30);
+        assert_eq!(flex.debug[0].0.y, 40);
+
+        assert_eq!(flex.debug[2].0.x, 50);
+        assert_eq!(flex.debug[2].0.y, 20);
+    }
 
     #[test]
     fn flex_horizontal() {
