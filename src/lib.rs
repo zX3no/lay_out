@@ -44,12 +44,6 @@ pub enum Primative {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub enum Direction {
-    Horizontal,
-    Vertical,
-}
-
-#[derive(Copy, Clone, Debug)]
 pub enum Button {
     Left,
     Right,
@@ -109,11 +103,125 @@ macro_rules! tlayout {
     (($widget:expr),*) => {};
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Center {
-    Horizontal,
-    Vertical,
-    Both,
+pub struct FlexImpl<F> {
+    pub f: Option<F>,
+}
+
+pub trait DrawFlex {
+    fn call(&mut self, layout: &mut Flex<Self>)
+    where
+        Self: Sized;
+}
+
+impl<F> DrawFlex for FlexImpl<F>
+where
+    F: FnOnce(FlexMode, usize, usize, usize, usize, usize, usize) -> Vec<(Rect, Primative)>,
+{
+    fn call(&mut self, flex: &mut Flex<Self>) {
+        if let Some(f) = self.f.take() {
+            flex.debug = (f)(
+                flex.flex,
+                flex.viewport_width,
+                flex.viewport_height,
+                flex.area.x,
+                flex.area.y,
+                flex.margin,
+                flex.padding,
+            );
+        }
+    }
+}
+
+pub struct Flex<F: DrawFlex> {
+    pub f: Option<F>,
+    pub flex: FlexMode,
+    pub area: Rect,
+    ///Outer padding
+    pub padding: usize,
+    ///Inner padding
+    pub margin: usize,
+    pub viewport_width: usize,
+    pub viewport_height: usize,
+    pub debug: Vec<(Rect, Primative)>,
+}
+
+impl<F: DrawFlex> Flex<F> {
+    pub fn force_draw(&mut self) {
+        if let Some(mut f) = self.f.take() {
+            f.call(self);
+        }
+    }
+}
+
+impl<F: DrawFlex> Drop for Flex<F> {
+    fn drop(&mut self) {
+        // if self.drawn {
+        //     return;
+        // }
+
+        if let Some(mut f) = self.f.take() {
+            f.call(self);
+        }
+    }
+}
+
+impl<F: DrawFlex> std::fmt::Debug for Flex<F> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Flex")
+            .field("f", if self.f.is_some() { &"Some" } else { &"None" })
+            .field("flex", &self.flex)
+            .field("area", &self.area)
+            .field("padding", &self.padding)
+            .field("margin", &self.margin)
+            .field("viewport_width", &self.viewport_width)
+            .field("viewport_height", &self.viewport_height)
+            .field("debug", &self.debug)
+            .finish()
+    }
+}
+
+#[macro_export]
+macro_rules! f {
+    ($($widget:expr),*) => {{
+        let f = |flex: FlexMode, viewport_width: usize, viewport_height: usize, x: usize, y: usize, margin: usize, padding: usize| -> Vec<(Rect, Primative)> {
+            let mut temp = Vec::new();
+
+            match flex {
+                FlexMode::Standard(direction, quadrant) => {
+                    //Could pack all of this into a struct. It might be faster.
+                    //Might check later.
+                    let _x = 0;
+                    let _y = 0;
+                    let (mut x, mut y) = flex_xy(quadrant, viewport_width, viewport_height, _x, _y);
+                    let start_x = x;
+                    let start_y = y;
+                    let mut max_height = 0;
+                    let mut max_width = 0;
+
+                    $(
+                        let w = widget(&mut $widget);
+                        let (x, y, max_width, max_height) = flex_basic(direction,quadrant, w, x, y, start_x, start_y, max_height, max_width, viewport_width, viewport_height, &mut temp);
+                    )*
+                }
+                FlexMode::Center(center) => {
+                    todo!();
+                }
+            }
+
+            temp
+        };
+
+        $crate::Flex {
+            f: Some(FlexImpl { f: Some(f) }),
+            flex: FlexMode::default(),
+            area: Rect::default(),
+            padding: 0,
+            margin: 0,
+            viewport_width: 0,
+            viewport_height: 0,
+            debug: Vec::new(),
+        }
+    }};
 }
 
 //This does centers all widgets horizontally.
@@ -293,27 +401,154 @@ macro_rules! flex_center {
     }};
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Flex {
+#[derive(Default, Copy, Clone, Debug, PartialEq)]
+pub enum Direction {
+    #[default]
+    Horizontal,
+    Vertical,
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
+pub enum Center {
+    #[default]
+    Horizontal,
+    Vertical,
+    Both,
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq)]
+pub enum Quadrant {
+    #[default]
     TopLeft,
     TopRight,
     BottomLeft,
     BottomRight,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum FlexMode {
+    Standard(Direction, Quadrant),
+    Center(Center),
+}
+
+impl Default for FlexMode {
+    fn default() -> Self {
+        Self::Standard(Direction::Horizontal, Quadrant::TopLeft)
+    }
+}
+
 pub fn flex_xy(
-    start: Flex,
+    start: Quadrant,
     viewport_width: usize,
     viewport_height: usize,
     x: usize,
     y: usize,
 ) -> (usize, usize) {
     match start {
-        Flex::TopLeft => (x, y),
-        Flex::TopRight => (viewport_width - x, y),
-        Flex::BottomLeft => (x, viewport_height - y),
-        Flex::BottomRight => (viewport_width - x, viewport_height - y),
+        Quadrant::TopLeft => (x, y),
+        Quadrant::TopRight => (viewport_width - x, y),
+        Quadrant::BottomLeft => (x, viewport_height - y),
+        Quadrant::BottomRight => (viewport_width - x, viewport_height - y),
     }
+}
+
+pub fn flex_basic<T: Widget>(
+    direction: Direction,
+    quadrant: Quadrant,
+    widget: &mut T,
+    mut x: usize,
+    mut y: usize,
+    start_x: usize,
+    start_y: usize,
+    mut max_width: usize,
+    mut max_height: usize,
+    viewport_width: usize,
+    viewport_height: usize,
+    temp: &mut Vec<(Rect, Primative)>,
+) -> (usize, usize, usize, usize) {
+    let area = widget.area_mut().unwrap();
+
+    match direction {
+        Direction::Horizontal => {
+            if match quadrant {
+                Quadrant::TopLeft => (x + area.width) >= viewport_width,
+                Quadrant::TopRight => x.checked_sub(area.width).is_none(),
+                _ => false,
+            } {
+                x = start_x;
+                y += max_height;
+                max_height = 0;
+            }
+
+            if match quadrant {
+                Quadrant::BottomLeft => (x + area.width) >= viewport_width,
+                Quadrant::BottomRight => x.checked_sub(area.width).is_none(),
+                _ => false,
+            } {
+                x = start_x;
+                y -= max_height;
+                max_height = 0;
+            }
+        }
+        Direction::Vertical => {
+            if match quadrant {
+                Quadrant::TopLeft => (y + area.height) >= viewport_height,
+                Quadrant::BottomLeft => y.checked_sub(area.height).is_none(),
+                _ => false,
+            } {
+                y = start_y;
+                x += max_width;
+                max_width = 0;
+            }
+
+            if match quadrant {
+                Quadrant::TopRight => (y + area.height) >= viewport_height,
+                Quadrant::BottomRight => y.checked_sub(area.height).is_none(),
+                _ => false,
+            } {
+                y = start_y;
+                x -= max_width;
+                max_width = 0;
+            }
+        }
+    }
+
+    if area.height > max_height {
+        max_height = area.height;
+    }
+
+    if area.width > max_width {
+        max_width = area.width;
+    }
+
+    area.x = x;
+    area.y = y;
+
+    //Stop the mutable borrow.
+    let area = widget.area();
+
+    //Click the widget once the layout is calculated.
+    widget.try_click();
+
+    //This is where the draw call would typically be issued.
+    temp.push((area, widget.primative()));
+
+    match direction {
+        Direction::Horizontal => {
+            match quadrant {
+                Quadrant::TopLeft | Quadrant::BottomLeft => x += area.width,
+                Quadrant::TopRight | Quadrant::BottomRight => x -= area.width,
+            };
+        }
+        Direction::Vertical => {
+            match quadrant {
+                Quadrant::TopLeft | Quadrant::TopRight => y += area.height,
+                Quadrant::BottomLeft | Quadrant::BottomRight => y -= area.height,
+            };
+        }
+    }
+
+    (x, y, max_width, max_height)
 }
 
 #[macro_export]
@@ -324,7 +559,7 @@ macro_rules! flex {
         let viewport_width: usize = $vw;
         let viewport_height: usize = $vh;
 
-        let flex: Flex = $flex;
+        let flex: Quadrant = $flex;
         let direction: Direction = $direction;
 
         let _x = 0;
@@ -343,8 +578,8 @@ macro_rules! flex {
             match direction {
                 Direction::Horizontal => {
                     if match flex {
-                        Flex::TopLeft => (x + area.width) >= viewport_width,
-                        Flex::TopRight => x.checked_sub(area.width).is_none(),
+                        Quadrant::TopLeft => (x + area.width) >= viewport_width,
+                        Quadrant::TopRight => x.checked_sub(area.width).is_none(),
                         _ => false,
                     } {
                         x = start_x;
@@ -353,8 +588,8 @@ macro_rules! flex {
                     }
 
                     if match flex {
-                        Flex::BottomLeft => (x + area.width) >= viewport_width,
-                        Flex::BottomRight => x.checked_sub(area.width).is_none(),
+                        Quadrant::BottomLeft => (x + area.width) >= viewport_width,
+                        Quadrant::BottomRight => x.checked_sub(area.width).is_none(),
                         _ => false,
                     } {
                         x = start_x;
@@ -364,8 +599,8 @@ macro_rules! flex {
                 }
                 Direction::Vertical => {
                     if match flex {
-                        Flex::TopLeft => (y + area.height) >= viewport_height,
-                        Flex::BottomLeft => y.checked_sub(area.height).is_none(),
+                        Quadrant::TopLeft => (y + area.height) >= viewport_height,
+                        Quadrant::BottomLeft => y.checked_sub(area.height).is_none(),
                         _ => false,
                     } {
                         y = start_y;
@@ -374,8 +609,8 @@ macro_rules! flex {
                     }
 
                     if match flex {
-                        Flex::TopRight => (y + area.height) >= viewport_height,
-                        Flex::BottomRight => y.checked_sub(area.height).is_none(),
+                        Quadrant::TopRight => (y + area.height) >= viewport_height,
+                        Quadrant::BottomRight => y.checked_sub(area.height).is_none(),
                         _ => false,
                     } {
                         y = start_y;
@@ -408,14 +643,14 @@ macro_rules! flex {
             match direction {
                 Direction::Horizontal => {
                     match flex {
-                        Flex::TopLeft | Flex::BottomLeft => x += area.width,
-                        Flex::TopRight | Flex::BottomRight => x -= area.width,
+                        Quadrant::TopLeft | Quadrant::BottomLeft => x += area.width,
+                        Quadrant::TopRight | Quadrant::BottomRight => x -= area.width,
                     };
                 }
                 Direction::Vertical =>  {
                     match flex {
-                        Flex::TopLeft | Flex::TopRight => y += area.height,
-                        Flex::BottomLeft | Flex::BottomRight => y -= area.height,
+                        Quadrant::TopLeft | Quadrant::TopRight => y += area.height,
+                        Quadrant::BottomLeft | Quadrant::BottomRight => y -= area.height,
                     };
                 }
             }
@@ -487,7 +722,7 @@ mod tests {
         let vw = 50;
         let vh = 40;
 
-        let test = flex!(Flex::TopLeft, Direction::Horizontal, vw, vh, h1, h2, h3);
+        let test = flex!(Quadrant::TopLeft, Direction::Horizontal, vw, vh, h1, h2, h3);
 
         assert_eq!(test[0].0.x, 0);
         assert_eq!(test[0].0.y, 0);
@@ -498,7 +733,15 @@ mod tests {
         assert_eq!(test[2].0.x, 0);
         assert_eq!(test[2].0.y, 20);
 
-        let test = flex!(Flex::TopRight, Direction::Horizontal, vw, vh, h1, h2, h3);
+        let test = flex!(
+            Quadrant::TopRight,
+            Direction::Horizontal,
+            vw,
+            vh,
+            h1,
+            h2,
+            h3
+        );
         assert_eq!(test[0].0.x, 50);
         assert_eq!(test[0].0.y, 0);
 
@@ -508,7 +751,15 @@ mod tests {
         assert_eq!(test[2].0.x, 50);
         assert_eq!(test[2].0.y, 20);
 
-        let test = flex!(Flex::BottomLeft, Direction::Horizontal, vw, vh, h1, h2, h3);
+        let test = flex!(
+            Quadrant::BottomLeft,
+            Direction::Horizontal,
+            vw,
+            vh,
+            h1,
+            h2,
+            h3
+        );
 
         assert_eq!(test[0].0.x, 0);
         assert_eq!(test[0].0.y, 40);
@@ -519,7 +770,15 @@ mod tests {
         assert_eq!(test[2].0.x, 0);
         assert_eq!(test[2].0.y, 20);
 
-        let test = flex!(Flex::BottomRight, Direction::Horizontal, vw, vh, h1, h2, h3);
+        let test = flex!(
+            Quadrant::BottomRight,
+            Direction::Horizontal,
+            vw,
+            vh,
+            h1,
+            h2,
+            h3
+        );
 
         assert_eq!(test[0].0.x, 50);
         assert_eq!(test[0].0.y, 40);
@@ -579,7 +838,7 @@ mod tests {
         let vw = 50;
         let vh = 50;
 
-        let test = flex!(Flex::TopLeft, Direction::Vertical, vw, vh, h1, h2, h3);
+        let test = flex!(Quadrant::TopLeft, Direction::Vertical, vw, vh, h1, h2, h3);
 
         assert_eq!(test[0].0.x, 0);
         assert_eq!(test[0].0.y, 0);
@@ -590,7 +849,7 @@ mod tests {
         assert_eq!(test[2].0.x, 20);
         assert_eq!(test[2].0.y, 0);
 
-        let test = flex!(Flex::TopRight, Direction::Vertical, vw, vh, h1, h2, h3);
+        let test = flex!(Quadrant::TopRight, Direction::Vertical, vw, vh, h1, h2, h3);
 
         assert_eq!(test[0].0.x, 50);
         assert_eq!(test[0].0.y, 0);
@@ -601,7 +860,15 @@ mod tests {
         assert_eq!(test[2].0.x, 30);
         assert_eq!(test[2].0.y, 0);
 
-        let test = flex!(Flex::BottomLeft, Direction::Vertical, vw, vh, h1, h2, h3);
+        let test = flex!(
+            Quadrant::BottomLeft,
+            Direction::Vertical,
+            vw,
+            vh,
+            h1,
+            h2,
+            h3
+        );
 
         assert_eq!(test[0].0.x, 0);
         assert_eq!(test[0].0.y, 50);
@@ -612,7 +879,15 @@ mod tests {
         assert_eq!(test[2].0.x, 20);
         assert_eq!(test[2].0.y, 50);
 
-        let test = flex!(Flex::BottomRight, Direction::Vertical, vw, vh, h1, h2, h3);
+        let test = flex!(
+            Quadrant::BottomRight,
+            Direction::Vertical,
+            vw,
+            vh,
+            h1,
+            h2,
+            h3
+        );
 
         assert_eq!(test[0].0.x, 50);
         assert_eq!(test[0].0.y, 50);
