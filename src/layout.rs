@@ -650,43 +650,45 @@ mod tests {
             },
         };
 
-        let mut flex = flex!(h1, h2);
-        flex.viewport_width = 40;
-        flex.viewport_height = 40;
-        flex.mode = FlexMode::Center(Center::Horizontal);
-        flex.force_draw();
+        {
+            let mut flex = flex!(h1, h2);
+            flex.viewport_width = 40;
+            flex.viewport_height = 40;
+            flex.mode = FlexMode::Center(Center::Horizontal);
+            flex.force_draw();
 
-        assert_eq!(flex.debug.len(), 2);
-        assert_eq!(flex.debug[0].0.x, 0);
-        assert_eq!(flex.debug[1].0.x, 20);
+            assert_eq!(flex.debug.len(), 2);
+            assert_eq!(flex.debug[0].0.x, 0);
+            assert_eq!(flex.debug[1].0.x, 20);
+        }
 
-        drop(flex);
+        {
+            let mut flex = flex!(h1, h2, h3);
+            flex.viewport_width = 40;
+            flex.viewport_height = 40;
+            flex.mode = FlexMode::Center(Center::Horizontal);
+            flex.force_draw();
 
-        let mut flex = flex!(h1, h2, h3);
-        flex.viewport_width = 40;
-        flex.viewport_height = 40;
-        flex.mode = FlexMode::Center(Center::Horizontal);
-        flex.force_draw();
+            assert_eq!(flex.debug.len(), 3);
+            assert_eq!(flex.debug[0].0.x, 0);
+            assert_eq!(flex.debug[1].0.x, 20);
+            //Middle is (40 / 2) - ((40 / 2) / 2) = 10
+            assert_eq!(flex.debug[2].0.x, 10);
+        }
 
-        assert_eq!(flex.debug.len(), 3);
-        assert_eq!(flex.debug[0].0.x, 0);
-        assert_eq!(flex.debug[1].0.x, 20);
-        //Middle is (40 / 2) - ((40 / 2) / 2) = 10
-        assert_eq!(flex.debug[2].0.x, 10);
+        {
+            let mut flex = flex!(h1, h2, h3, h4);
+            flex.viewport_width = 40;
+            flex.viewport_height = 40;
+            flex.mode = FlexMode::Center(Center::Horizontal);
+            flex.force_draw();
 
-        drop(flex);
-
-        let mut flex = flex!(h1, h2, h3, h4);
-        flex.viewport_width = 40;
-        flex.viewport_height = 40;
-        flex.mode = FlexMode::Center(Center::Horizontal);
-        flex.force_draw();
-
-        assert_eq!(flex.debug.len(), 4);
-        assert_eq!(flex.debug[0].0.x, 0);
-        assert_eq!(flex.debug[1].0.x, 20);
-        assert_eq!(flex.debug[2].0.x, 0);
-        assert_eq!(flex.debug[3].0.x, 20);
+            assert_eq!(flex.debug.len(), 4);
+            assert_eq!(flex.debug[0].0.x, 0);
+            assert_eq!(flex.debug[1].0.x, 20);
+            assert_eq!(flex.debug[2].0.x, 0);
+            assert_eq!(flex.debug[3].0.x, 20);
+        }
     }
 
     #[test]
