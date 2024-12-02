@@ -538,7 +538,6 @@ macro_rules! flex_center {
                             max: max_height,
                             widget_count,
                         });
-                //TODO: Cleanup and move into functions.
 
                         total_width_of_largest += max_width;
 
@@ -1000,6 +999,87 @@ mod tests {
 
         assert_eq!(flex.debug[2].0.x, 50);
         assert_eq!(flex.debug[2].0.y, 20);
+    }
+
+    #[test]
+    fn flex_center_new() {
+        let mut h1 = Header {
+            title: "hi",
+            area: Rect {
+                x: 0,
+                y: 0,
+                width: 20,
+                height: 20,
+            },
+        };
+
+        let mut h2 = Header {
+            title: "hi",
+            area: Rect {
+                x: 0,
+                y: 0,
+                width: 20,
+                height: 20,
+            },
+        };
+
+        let mut h3 = Header {
+            title: "hi",
+            area: Rect {
+                x: 0,
+                y: 0,
+                width: 20,
+                height: 20,
+            },
+        };
+
+        let mut h4 = Header {
+            title: "hi",
+            area: Rect {
+                x: 0,
+                y: 0,
+                width: 20,
+                height: 20,
+            },
+        };
+
+        let mut flex = f!(h1, h2);
+        flex.viewport_width = 40;
+        flex.viewport_height = 40;
+        flex.mode = FlexMode::Center(Center::Horizontal);
+        flex.force_draw();
+
+        assert_eq!(flex.debug.len(), 2);
+        assert_eq!(flex.debug[0].0.x, 0);
+        assert_eq!(flex.debug[1].0.x, 20);
+
+        drop(flex);
+
+        let mut flex = f!(h1, h2, h3);
+        flex.viewport_width = 40;
+        flex.viewport_height = 40;
+        flex.mode = FlexMode::Center(Center::Horizontal);
+        flex.force_draw();
+
+        assert_eq!(flex.debug.len(), 3);
+        assert_eq!(flex.debug[0].0.x, 0);
+        assert_eq!(flex.debug[1].0.x, 20);
+        //Middle is (40 / 2) - ((40 / 2) / 2) = 10
+        assert_eq!(flex.debug[2].0.x, 10);
+
+        drop(flex);
+
+        let mut flex = f!(h1, h2, h3, h4);
+        flex.viewport_width = 40;
+        flex.viewport_height = 40;
+        flex.mode = FlexMode::Center(Center::Horizontal);
+        flex.force_draw();
+
+        assert_eq!(flex.debug.len(), 4);
+        assert_eq!(flex.debug[0].0.x, 0);
+        assert_eq!(flex.debug[1].0.x, 20);
+        assert_eq!(flex.debug[2].0.x, 0);
+        assert_eq!(flex.debug[3].0.x, 20);
     }
 
     #[test]
