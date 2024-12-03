@@ -38,7 +38,6 @@ impl Default for FlexMode {
 
 #[derive(Debug)]
 pub struct Segment {
-    pub direction: Direction,
     ///Either the total height or width.
     ///Depends on the direction.
     pub size: usize,
@@ -50,7 +49,6 @@ pub struct Segment {
 impl Segment {
     pub const fn new() -> Self {
         Self {
-            direction: Direction::Horizontal,
             size: 0,
             max: 0,
             widget_count: 0,
@@ -171,7 +169,6 @@ pub fn calculate_segments<T: Widget>(
         Center::Horizontal => {
             if (total_width + area.width > viewport_width) || i == count {
                 segments.push(Segment {
-                    direction: Direction::Horizontal,
                     size: total_width,
                     max: max_width,
                     widget_count,
@@ -189,7 +186,6 @@ pub fn calculate_segments<T: Widget>(
         Center::Vertical => {
             if (total_height + area.height > viewport_height) || i == count {
                 segments.push(Segment {
-                    direction: Direction::Vertical,
                     size: total_height,
                     max: max_height,
                     widget_count,
