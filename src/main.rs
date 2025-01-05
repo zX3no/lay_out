@@ -43,6 +43,10 @@ fn main() {
 
     let test = flex_center!(Center::Horizontal, vw, vh, h1, h2, h3);
 
+    let mut flex = v!(h1, h2, h3).wh(40);
+    flex.force_draw();
+    dbg!(flex);
+
     // dbg!(&test);
 
     // assert_eq!(test.len(), 3);

@@ -100,6 +100,45 @@ pub struct Flex<F: DrawFlex> {
 }
 
 impl<F: DrawFlex> Flex<F> {
+    pub fn mode(mut self, mode: FlexMode) -> Self {
+        self.mode = mode;
+        self
+    }
+
+    pub fn area(mut self, area: Rect) -> Self {
+        self.area = area;
+        self
+    }
+
+    pub fn padding(mut self, padding: usize) -> Self {
+        self.padding = padding;
+        self
+    }
+
+    pub fn margin(mut self, margin: usize) -> Self {
+        self.margin = margin;
+        self
+    }
+
+    //These would be inherited from the area trait.
+    pub fn wh(mut self, size: usize) -> Self {
+        self.viewport_width = size;
+        self.viewport_height = size;
+        self
+    }
+
+    pub fn width(mut self, width: usize) -> Self {
+        self.viewport_width = width;
+        self
+    }
+
+    pub fn height(mut self, height: usize) -> Self {
+        self.viewport_height = height;
+        self
+    }
+}
+
+impl<F: DrawFlex> Flex<F> {
     //TODO: Not sure how to do this better.
     pub fn force_draw(&mut self) {
         let mut f = self.f.take();
@@ -394,8 +433,23 @@ pub fn flex_standard<T: Widget>(
 }
 
 #[macro_export]
+macro_rules! h {
+    ($($widget:expr),* $(,)?) => {
+        flex!($($widget),*).mode(FlexMode::Standard(Direction::Horizontal, Quadrant::TopLeft))
+    };
+}
+
+#[macro_export]
+macro_rules! v {
+    ($($widget:expr),* $(,)?) => {
+        flex!($($widget),*).mode(FlexMode::Standard(Direction::Vertical, Quadrant::TopLeft))
+    };
+}
+
+#[macro_export]
 macro_rules! flex {
-    ($($widget:expr),*) => {{
+    ($($widget:expr),* $(,)?) => {{
+        //TODO: This should also return the flex area alongside all of the widgets.
         let f = |flex: FlexMode, viewport_width: usize, viewport_height: usize, x: usize, y: usize, _margin: usize, _padding: usize| -> Vec<(Rect, Primative)> {
             let mut temp = Vec::new();
 
@@ -552,10 +606,8 @@ mod tests {
             },
         };
 
-        let mut flex = flex!(h1, h2, h3);
-        flex.viewport_width = 50;
-        flex.viewport_height = 40;
-        flex.mode = FlexMode::Standard(Direction::Horizontal, Quadrant::TopLeft);
+        let mut flex = h!(h1, h2, h3).width(50).height(40);
+
         flex.force_draw();
 
         assert_eq!(flex.debug[0].0.x, 0);
@@ -647,10 +699,10 @@ mod tests {
         };
 
         {
-            let mut flex = flex!(h1, h2);
-            flex.viewport_width = 40;
-            flex.viewport_height = 40;
-            flex.mode = FlexMode::Center(Center::Horizontal);
+            let mut flex = flex!(h1, h2)
+                .mode(FlexMode::Center(Center::Horizontal))
+                .wh(40);
+
             flex.force_draw();
 
             assert_eq!(flex.debug.len(), 2);
@@ -659,10 +711,10 @@ mod tests {
         }
 
         {
-            let mut flex = flex!(h1, h2, h3);
-            flex.viewport_width = 40;
-            flex.viewport_height = 40;
-            flex.mode = FlexMode::Center(Center::Horizontal);
+            let mut flex = flex!(h1, h2, h3)
+                .mode(FlexMode::Center(Center::Horizontal))
+                .wh(40);
+
             flex.force_draw();
 
             assert_eq!(flex.debug.len(), 3);
@@ -673,10 +725,10 @@ mod tests {
         }
 
         {
-            let mut flex = flex!(h1, h2, h3, h4);
-            flex.viewport_width = 40;
-            flex.viewport_height = 40;
-            flex.mode = FlexMode::Center(Center::Horizontal);
+            let mut flex = flex!(h1, h2, h3, h4)
+                .mode(FlexMode::Center(Center::Horizontal))
+                .wh(40);
+
             flex.force_draw();
 
             assert_eq!(flex.debug.len(), 4);
