@@ -468,8 +468,8 @@ macro_rules! flex {
                     let max_width = 0;
 
                     $(
-                        let t = &mut $widget;
-                        let w = widget(t);
+                        let w = &mut $widget;
+                        // let w = widget(t);
                         #[allow(unused)]
                         let (x, y, max_width, max_height) = flex_standard(direction,quadrant, w, x, y, start_x, start_y, max_height, max_width, viewport_width, viewport_height, &mut temp);
                     )*
@@ -491,8 +491,8 @@ macro_rules! flex {
 
                     //The first loop is required to calculate the segments.
                     $(
-                        let t = &mut $widget;
-                        let w = widget(t);
+                        let w = &mut $widget;
+                        // let w = widget(t);
 
                         #[allow(unused)]
                         let (i, widget_count, max_width, max_height, total_width, total_height, total_width_of_largest, total_height_of_largest) = calculate_segments(
@@ -539,8 +539,8 @@ macro_rules! flex {
                     let segment_index = 0;
 
                     $(
-                        let t = &mut $widget;
-                        let w = widget(t);
+                        let w = &mut $widget;
+                        // let w = widget(t);
 
                         #[allow(unused)]
                         let (widget_index, segment_index, x, y, spacing) = draw_segments(

@@ -19,7 +19,8 @@ macro_rules! flex_standard {
         let mut max_width = 0;
 
         $(
-            let w = widget(&mut $widget);
+            // let w = widget(&mut $widget);
+            let w = &mut $widget;
             let area = w.area_mut().unwrap();
 
             match direction {
@@ -268,7 +269,8 @@ macro_rules! flex_center {
                 };
             }
 
-            let w = widget(&mut $widget);
+            // let w = widget(&mut $widget);
+            let w = &mut $widget;
 
             let area = w.area_mut().unwrap();
 
