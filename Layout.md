@@ -2,13 +2,13 @@ Absolute positioning
 
 ```rs
 //Default quadrant is top left, 20 units to the left
-absolute!(text()).x(20)
+flex!(text()).x(20)
 
 //20 units left and up from the bottom right corner.
-absolute!(text()).xy(20).quadrant(BottomRight)
+flex!(text()).xy(20).quadrant(BottomRight)
 
 //20 units left and down from the top right corner.
-absolute!(text()).xy(20).quadrant(TopRight)
+flex!(text()).xy(20).quadrant(TopRight)
 ```
 
 Flex positioning
@@ -31,4 +31,3 @@ flex!(t, t, t).vcenter()
 //3 items will be spaced evenly across the parent viewport width and height.
 flex!(t, t, t).vhcenter()
 ```
-

@@ -2,7 +2,7 @@
 #![allow(unused_assignments, static_mut_refs)]
 
 pub mod basic;
-pub mod layout;
+pub mod flex;
 
 pub mod softui;
 pub use softui::*;
@@ -10,7 +10,7 @@ pub use softui::*;
 #[cfg(test)]
 mod tests;
 
-pub use layout::*;
+pub use flex::*;
 
 // use softui::Color;
 // pub use softui::{Primative, Rect, Widget};
