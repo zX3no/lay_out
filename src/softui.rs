@@ -26,7 +26,7 @@ impl From<f32> for Unit {
     }
 }
 
-#[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Rect {
     pub x: usize,
     pub y: usize,
