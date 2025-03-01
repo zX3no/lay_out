@@ -136,6 +136,16 @@ impl<F: DrawFlex> Flex<F> {
         self.viewport_height = height;
         self
     }
+
+    pub fn vertical(mut self) -> Self {
+        self.mode = FlexMode::Standard(Direction::Vertical, Quadrant::TopLeft);
+        self
+    }
+
+    pub fn horizontal(mut self) -> Self {
+        self.mode = FlexMode::Standard(Direction::Horizontal, Quadrant::TopLeft);
+        self
+    }
 }
 
 impl<F: DrawFlex> Flex<F> {
