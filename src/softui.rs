@@ -26,6 +26,10 @@ impl From<f32> for Unit {
     }
 }
 
+pub fn rect() -> Rect {
+    Rect::default()
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Rect {
     pub x: usize,
@@ -85,6 +89,11 @@ impl Rect {
         }
     }
 
+    #[inline]
+    pub const fn closure(&self) -> impl Fn(Rect) -> Rect {
+        |rect: Rect| rect
+    }
+
     // pub const fn inner(self, w: u16, h: u16) -> Result<Rect, &'static str> {
     //     if self.width < 2 * w {
     //         Err("Inner area exceeded outside area. Reduce margin width.")
@@ -99,6 +108,22 @@ impl Rect {
     //         })
     //     }
     // }
+}
+
+impl Widget for Rect {
+    type Layout = Self;
+
+    fn primative(&self) -> Primative {
+        todo!()
+    }
+
+    fn area(&self) -> Rect {
+        *self
+    }
+
+    fn area_mut(&mut self) -> Option<&mut Rect> {
+        Some(self)
+    }
 }
 
 #[derive(Debug, Copy, Clone)]
