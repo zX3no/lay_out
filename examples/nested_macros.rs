@@ -1,4 +1,4 @@
-#![allow(static_mut_refs)]
+#![allow(static_mut_refs, unused)]
 use lay_out::*;
 
 struct Closure<T: Fn(Rect) -> Rect>(T);

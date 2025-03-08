@@ -5,3 +5,11 @@ version = 4
 [[package]]
 name = "lay_out"
 version = "0.1.0"
+dependencies = [
+ "mini",
+]
+
+[[package]]
+name = "mini"
+version = "0.1.0"
+source = "git+https://github.com/zX3no/mini.git#7287c86f7503ead33a9e7fae1b112db0fdee652d"

@@ -2,7 +2,13 @@
 #![feature(box_as_ptr)]
 // use lay_out::*;
 
-use std::{cell::UnsafeCell, ops::Add};
+use std::{
+    cell::UnsafeCell,
+    mem::transmute,
+    ops::{Add, DerefMut},
+    pin::{pin, Pin},
+    ptr::addr_of_mut,
+};
 
 fn rect() -> Rect {
     Rect::default()
@@ -45,7 +51,7 @@ impl Rect {
             height,
         }
     }
-    fn into_ui<'a, const N: usize>(self, parent: *mut UIElement<N>) -> Box<UIElement<N>> {
+    fn into_ui<'a, const N: usize>(self, parent: *mut UIElement<'a, N>) -> Box<UIElement<'a, N>> {
         Box::new(UIElement {
             area: self,
             parent: Some(parent),
@@ -83,20 +89,21 @@ pub enum Direction {
 }
 
 #[derive(Default)]
-struct UIElement<const N: usize> {
+struct UIElement<'a, const N: usize> {
     //Width and height of 0 will use fit sizing.
     area: Rect,
     direction: Direction,
     padding: Padding,
     //Temp bypass
-    parent: Option<*mut UIElement<N>>,
-    children: Option<[Box<UIElement<N>>; N]>,
+    parent: Option<*mut UIElement<'a, N>>,
+    children: Option<[&'a UIElement<'a, N>; N]>,
     gap: usize,
 }
+
 fn main() {
     //32, 32
-
-    let mut root = Box::new(UIElement {
+    //root is box for static
+    let mut r = UIElement {
         // area: Rect::new(0, 0, 960, 540),
         area: Rect::new(0, 0, 0, 0),
         parent: None,
@@ -105,19 +112,27 @@ fn main() {
         // children: Some([&red, &yellow]),
         children: None,
         gap: 32,
-    });
+    };
 
-    unsafe {
-        let mut red = Rect::new(0, 0, 300, 300).into_ui(Box::as_mut_ptr(&mut root));
-        let mut yellow = Rect::new(0, 0, 350, 200).into_ui(Box::as_mut_ptr(&mut root));
-        root.children = Some([red, yellow]);
-    }
+    let mut root = Pin::new(&mut r);
 
-    for child in root.children.as_ref().unwrap() {
+    //A Pin<Ptr> does not pin the Ptr but rather the pointer’s pointee value.
+    //In this case (&mut UIElement) is not pinned but rather the UIElement.
+    //It's unclear how we can bypass the aliasing rules with this.
+    //I have a feeling that Pin does not support this and I'll need to think of
+    //a safer way of doing this.
+    //TODO: Read through https://doc.rust-lang.org/std/pin/index.html
+    let root_ptr = root.deref_mut() as *mut _;
+
+    let mut red = unsafe { Rect::new(0, 0, 300, 300).into_ui(root_ptr) };
+    let mut yellow = unsafe { Rect::new(0, 0, 350, 200).into_ui(root_ptr) };
+    root.children = Some([&red, &yellow]);
+
+    for child in root.children.unwrap() {
         root.area.width += root.padding.left + root.padding.right;
         root.area.height += root.padding.top + root.padding.bottom;
 
-        let gap = (root.children.as_ref().unwrap().len() - 1) * root.gap;
+        let gap = (root.children.unwrap().len() - 1) * root.gap;
 
         match root.direction {
             Direction::LeftRight => {
@@ -137,7 +152,7 @@ fn main() {
     match root.direction {
         Direction::LeftRight => {
             let mut left_offset = root.padding.left;
-            for child in root.children.as_ref().unwrap() {
+            for child in root.children.unwrap() {
                 let x = root.area.x + child.area.x + left_offset;
                 let y = root.area.y + child.area.y + root.padding.top;
                 println!("x:{x} y:{y}");
@@ -146,7 +161,7 @@ fn main() {
         }
         Direction::TopBottom => {
             let mut top_offset = root.padding.top;
-            for child in root.children.as_ref().unwrap() {
+            for child in root.children.unwrap() {
                 let x = root.area.x + child.area.x + root.padding.left;
                 let y = root.area.y + child.area.y + top_offset;
                 println!("x:{x} y:{y}");

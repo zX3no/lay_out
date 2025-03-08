@@ -3,6 +3,10 @@ name = "lay_out"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+profile = ["mini/profile"]
+
 [dependencies]
+mini = { git = "https://github.com/zX3no/mini.git", version = "0.1.0" }
 # softui = { version = "0.1.0", path = "../softui" }
 # softui = { git = "https://github.com/zX3no/softui.git", version = "0.1.0" }
