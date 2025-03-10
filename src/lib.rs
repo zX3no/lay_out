@@ -3,11 +3,9 @@
 
 pub mod basic;
 pub mod flex;
-pub mod smallvec;
 
 pub mod softui;
 pub use softui::*;
-pub use smallvec::*;
 
 #[cfg(test)]
 mod tests;

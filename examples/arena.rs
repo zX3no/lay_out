@@ -7,7 +7,7 @@ use std::{
 
 use mini::{defer_results, profile};
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone, Copy)]
 struct Padding {
     left: usize,
     top: usize,
@@ -26,7 +26,7 @@ impl Padding {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone, Copy)]
 pub enum Direction {
     #[default]
     LeftRight,
@@ -76,6 +76,12 @@ impl Rect {
             height,
         }
     }
+    fn into_node(self) -> Node {
+        Node {
+            area: self,
+            ..Default::default()
+        }
+    }
     // fn into_ui<'a, const N: usize>(self, parent: *mut UIElement<'a, N>) -> Box<UIElement<'a, N>> {
     //     Box::new(UIElement {
     //         area: self,
@@ -85,7 +91,9 @@ impl Rect {
     // }
 }
 
-#[derive(Default)]
+//I'll keep it simple for now,
+//there are likely ways to improve this.
+#[derive(Default, Debug)]
 struct Arena(Vec<Node>);
 
 impl Deref for Arena {
@@ -106,13 +114,20 @@ impl Arena {
     fn get_node(&self, node: usize) -> Option<&Node> {
         self.get(node)
     }
-    fn add_node(&mut self, parent: Option<usize>) -> usize {
+    fn get_node_mut(&mut self, node: usize) -> Option<&mut Node> {
+        self.get_mut(node)
+    }
+    fn create_node(&mut self, parent: Option<usize>) -> usize {
         let mut node = Node::default();
+        self.add_node(node, parent)
+    }
+    fn add_node(&mut self, mut node: Node, parent: Option<usize>) -> usize {
         let idx = self.len();
         node.index = idx;
         node.parent = parent;
 
-        if let Some(parent) = parent {
+        //Add the child node to the parent
+        if let Some(parent) = node.parent {
             if let Some(parent) = self.get_mut(parent) {
                 parent.children.push(idx);
             }
@@ -123,9 +138,7 @@ impl Arena {
     }
 }
 
-// struct ParentNode(usize);
-
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone)]
 struct Node {
     area: Rect,
     direction: Direction,
@@ -139,29 +152,62 @@ struct Node {
 fn main() {
     defer_results!();
 
-    let len = 10;
-    assert_eq!(len << 1, (len << 1) | false as usize);
-
     let mut ar = Arena::default();
 
-    let parent = ar.add_node(None);
+    let parent = ar.create_node(None);
 
-    for _ in 0..1_000_000 {
-        ar.add_node(Some(parent));
+    let mut red = Rect::new(0, 0, 300, 300).into_node();
+    let mut yellow = Rect::new(0, 0, 350, 200).into_node();
+
+    ar.add_node(red, Some(parent));
+    ar.add_node(yellow, Some(parent));
+
+    //If we want to avoid the clone here,
+    //we need to guarentee that `ar[parent_idx].children` is not changed while iterating.
+    for child_idx in ar[parent].children.clone() {
+        let [root, child] = ar.get_disjoint_mut([parent, child_idx]).unwrap();
+
+        root.area.width += root.padding.left + root.padding.right;
+        root.area.height += root.padding.top + root.padding.bottom;
+
+        let gap = (root.children.len() - 1) * root.gap;
+
+        match root.direction {
+            Direction::LeftRight => {
+                root.area.width += child.area.width + gap;
+                root.area.height += child.area.height.max(root.area.height);
+            }
+            Direction::TopBottom => {
+                root.area.width += child.area.width.max(root.area.width);
+                root.area.height += child.area.height + gap;
+            }
+            _ => todo!(),
+        }
     }
 
-    profile!();
-
-    let p = ar.get_node(parent).unwrap();
-    for child in &p.children {
-        let node = ar.get_node(*child).unwrap();
-        assert!(node.area.x == 0);
+    //Not liking the need to index every time here to avoid aliasing issues.
+    //It's a shame the complier is unable to figure this out.
+    match ar[parent].direction {
+        Direction::LeftRight => {
+            let mut left_offset = ar[parent].padding.left;
+            for child in ar[parent].children.clone() {
+                let [root, child] = ar.get_disjoint_mut([parent, child]).unwrap();
+                let x = root.area.x + child.area.x + left_offset;
+                let y = root.area.y + child.area.y + root.padding.top;
+                println!("x:{x} y:{y}");
+                left_offset += child.area.width + root.gap;
+            }
+        }
+        Direction::TopBottom => {
+            let mut top_offset = ar[parent].padding.top;
+            for child in ar[parent].children.clone() {
+                let [root, child] = ar.get_disjoint_mut([parent, child]).unwrap();
+                let x = root.area.x + child.area.x + root.padding.left;
+                let y = root.area.y + child.area.y + top_offset;
+                println!("x:{x} y:{y}");
+                top_offset += child.area.height + root.gap;
+            }
+        }
+        _ => todo!(),
     }
-
-    // let child1 = arena.add_node(Some(parent));
-    // let child2 = arena.add_node(Some(parent));
-
-    // dbg!(arena.get_node(parent).unwrap().area);
-    // dbg!(arena.get_node(child1).unwrap().area);
-    // dbg!(arena.get_node(child2).unwrap().area);
 }
