@@ -30,7 +30,7 @@ pub fn rect() -> Rect {
     Rect::default()
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
 pub struct Rect {
     pub x: usize,
     pub y: usize,
@@ -39,14 +39,14 @@ pub struct Rect {
 }
 
 impl Rect {
-    pub const fn default() -> Self {
-        Self {
-            x: 0,
-            y: 0,
-            width: 0,
-            height: 0,
-        }
-    }
+    // pub const fn default() -> Self {
+    //     Self {
+    //         x: 0,
+    //         y: 0,
+    //         width: 0,
+    //         height: 0,
+    //     }
+    // }
     pub const fn new(x: usize, y: usize, width: usize, height: usize) -> Self {
         Self {
             x,
