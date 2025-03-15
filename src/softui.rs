@@ -1,3 +1,5 @@
+use crate::Rectangle;
+
 pub enum Unit {
     Px(usize),
     ///Relative to the font-size of the element
@@ -24,10 +26,6 @@ impl From<f32> for Unit {
     fn from(val: f32) -> Self {
         Unit::Percentage((val * 100.0) as usize)
     }
-}
-
-pub fn rect() -> Rect {
-    Rect::default()
 }
 
 #[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
@@ -138,11 +136,12 @@ pub enum MouseButton {
 }
 
 #[repr(transparent)]
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Default, Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Color(pub u32);
 
 #[derive(Debug, Clone)]
 pub enum Primative {
+    ///Radius, Color
     Ellipse(usize, Color),
     RectangleOutline(Color),
     Text(String, usize, Color),

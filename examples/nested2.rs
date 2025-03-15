@@ -1,6 +1,13 @@
 #![allow(unused)]
 use lay_out::*;
 
+#[derive(Default, Copy, Clone, Debug, PartialEq)]
+pub enum Direction {
+    #[default]
+    Horizontal,
+    Vertical,
+}
+
 #[derive(Default, Debug, Clone)]
 struct Node {
     area: Rect,

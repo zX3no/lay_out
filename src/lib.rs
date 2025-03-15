@@ -1,16 +1,23 @@
 #![feature(associated_type_defaults)]
 #![allow(unused_assignments, static_mut_refs)]
 
-pub mod basic;
-pub mod flex;
+// pub mod basic;
+// pub mod flex;
+// pub use flex::*;
+
+// #[cfg(test)]
+// mod tests;
+
+pub mod grow;
 
 pub mod softui;
 pub use softui::*;
 
-#[cfg(test)]
-mod tests;
+pub use grow::*;
 
-pub use flex::*;
+
+
+
 
 // use softui::Color;
 // pub use softui::{Primative, Rect, Widget};
@@ -59,6 +66,6 @@ impl Widget for Header {
 macro_rules! count_expr {
     () => { 0 };
     ($first:expr $(, $rest:expr)*) => {
-        1 + count_expr!($($rest),*)
+        1 + $crate::count_expr!($($rest),*)
     };
 }
