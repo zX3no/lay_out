@@ -1,4 +1,5 @@
-#![allow(unused)]
+#![allow(unused, internal_features)]
+#![feature(const_type_id, core_intrinsics)]
 
 macro_rules! v {
     ($elem:expr) => {
@@ -24,42 +25,59 @@ enum Primative {
     StaticText(&'static str),
 }
 
-#[derive(Debug)]
+struct Tree(Node);
+
+#[derive(Default, Debug)]
 struct Node {
     children: Vec<Node>,
     value: Option<Primative>,
 }
 
+// impl Drop for Node {
+//     fn drop(&mut self) {
+//         dbg!(self);
+//     }
+// }
+
 fn rect() -> Node {
-    Node {
-        children: Vec::new(),
-        value: Some(Primative::StaticText("rect")),
-    }
+    Node::default()
 }
 
 fn text() -> Node {
-    Node {
-        children: Vec::new(),
-        value: Some(Primative::StaticText("text")),
-    }
+    Node::default()
 }
 
 fn image() -> Node {
-    Node {
-        children: Vec::new(),
-        value: Some(Primative::StaticText("image")),
-    }
+    Node::default()
 }
 
 fn svg() -> Node {
-    Node {
-        children: Vec::new(),
-        value: Some(Primative::StaticText("svg")),
-    }
+    Node::default()
+}
+
+fn extend_lifetime<'a, T>(t: &'a T) -> &'static T {
+    unsafe { std::mem::transmute::<&'a T, &'static T>(t) }
+}
+
+const fn is_tree_container<T: 'static>(value: &T) -> bool {
+    std::intrinsics::type_id::<T>() == std::intrinsics::type_id::<Node>()
+}
+
+macro_rules! parse {
+    ($e:expr) => {{
+        dbg!($e);
+    }};
+    ($e:expr, $($tail:tt)*) => {{
+        let mut parent = Node {
+            children: Vec::new(),
+            value: None,
+        };
+    }};
 }
 
 fn main() {
-    let tree = v!(rect(), text(), v!(image(), svg()));
-    let tree2 = v!(rect());
-    dbg!(&tree, tree2);
+    // let tree = v!(rect(), text(), v!(image(), svg()));
+    // let tree2 = v!(rect());
+
+    parse!(rect(), text(), parse!(image(), svg()))
 }
