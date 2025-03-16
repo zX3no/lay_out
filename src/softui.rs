@@ -1,4 +1,4 @@
-use crate::Rectangle;
+use std::fmt::Display;
 
 pub enum Unit {
     Px(usize),
@@ -108,6 +108,16 @@ impl Rect {
     // }
 }
 
+impl Display for Rect {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "x: {}, y: {}, width: {}, height: {}",
+            self.x, self.y, self.width, self.height
+        )
+    }
+}
+
 impl Widget for Rect {
     type Layout = Self;
 
@@ -147,6 +157,16 @@ pub enum Primative {
     Text(String, usize, Color),
 }
 
+impl Display for Primative {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Primative::Ellipse(_, _) => write!(f, "Ellipse"),
+            Primative::RectangleOutline(_) => write!(f, "RectangleOutline"),
+            Primative::Text(_, _, _) => write!(f, "Text"),
+        }
+    }
+}
+
 pub trait Widget
 where
     Self: Sized,
@@ -157,49 +177,15 @@ where
     #[must_use]
     fn primative(&self) -> Primative;
 
-    ///Turns all widget types into a slice so they can be concatenated for layouting.
     #[inline]
-    fn as_uniform_layout_type(&self) -> &[Self::Layout] {
-        //Not sure why the type system cannot figure this one out?
-        unsafe { core::mem::transmute(core::slice::from_ref(self)) }
+    fn as_container_slice_mut(&mut self) -> &mut [(Rect, Primative)] {
+        unreachable!("This function should never be called on non-container types.")
     }
-
-    //TODO: Remove me
-    fn as_mut_slice(&mut self) -> &mut [Self]
-    where
-        Self: Sized,
-    {
-        core::slice::from_mut(self)
-    }
-
-    // fn into_vec(self) -> Vec<Self>
-    // where
-    //     Self: Sized,
-    // {
-    //     vec![self]
-    // }
 
     //This one copies
     fn area(&self) -> Rect;
     //This one does not
     fn area_mut(&mut self) -> Option<&mut Rect>;
-
-    // #[inline]
-    // fn on_click<F: FnMut(&mut Self)>(self, button: MouseButton, click_fn: F) -> Click0<Self, F>
-    // where
-    //     Self: Sized,
-    // {
-    //     Click0 {
-    //         widget: self,
-    //         //Yes the comma is necassary.
-    //         click: ((button, click_fn),),
-    //     }
-    // }
-
-    #[inline]
-    unsafe fn as_mut_ptr(&mut self) -> *mut Self {
-        self
-    }
 
     //This should be called need_draw, need_compute_area, idk...
     //If we used Any we could just call self.type_id() == Container.
@@ -211,79 +197,6 @@ where
     {
         false
     }
-
-    //This is used to run the click closure after calling on_click
-    //This should be hidden from the user and only implemented on `Click`.
-    //https://stackoverflow.com/questions/77562161/is-there-a-way-to-prevent-a-struct-from-implementing-a-trait-method
-    #[inline]
-    fn try_click(&mut self) {}
-
-    /// The user's cusor has been clicked and released on top of a widget.
-    // fn clicked(&mut self, button: MouseButton) -> bool
-    // where
-    //     Self: Sized,
-    // {
-    //     let ctx = ctx();
-    //     let area = self.area();
-
-    //     if !ctx.mouse_pos.intersects(area) {
-    //         return false;
-    //     }
-
-    //     match button {
-    //         MouseButton::Left => {
-    //             ctx.left_mouse.released && ctx.left_mouse.inital_position.intersects(area)
-    //         }
-    //         MouseButton::Right => {
-    //             ctx.right_mouse.released && ctx.right_mouse.inital_position.intersects(area)
-    //         }
-    //         MouseButton::Middle => {
-    //             ctx.middle_mouse.released && ctx.middle_mouse.inital_position.intersects(area)
-    //         }
-    //         MouseButton::Back => {
-    //             ctx.mouse_4.released && ctx.mouse_4.inital_position.intersects(area)
-    //         }
-    //         MouseButton::Forward => {
-    //             ctx.mouse_5.released && ctx.mouse_5.inital_position.intersects(area)
-    //         }
-    //     }
-    // }
-    // fn up(&mut self, button: MouseButton) -> bool
-    // where
-    //     Self: Sized,
-    // {
-    //     let ctx = ctx();
-    //     let area = self.area_mut().unwrap().clone();
-    //     if !ctx.mouse_pos.intersects(area) {
-    //         return false;
-    //     }
-
-    //     match button {
-    //         MouseButton::Left => ctx.left_mouse.released,
-    //         MouseButton::Right => ctx.right_mouse.released,
-    //         MouseButton::Middle => ctx.middle_mouse.released,
-    //         MouseButton::Back => ctx.mouse_4.released,
-    //         MouseButton::Forward => ctx.mouse_5.released,
-    //     }
-    // }
-    // fn down(&mut self, button: MouseButton) -> bool
-    // where
-    //     Self: Sized,
-    // {
-    //     let ctx = ctx();
-    //     let area = self.area_mut().unwrap().clone();
-    //     if !ctx.mouse_pos.intersects(area) {
-    //         return false;
-    //     }
-
-    //     match button {
-    //         MouseButton::Left => ctx.left_mouse.pressed,
-    //         MouseButton::Right => ctx.right_mouse.pressed,
-    //         MouseButton::Middle => ctx.middle_mouse.pressed,
-    //         MouseButton::Back => ctx.mouse_4.pressed,
-    //         MouseButton::Forward => ctx.mouse_5.pressed,
-    //     }
-    // }
 
     fn centered(mut self, parent: Rect) -> Self
     where

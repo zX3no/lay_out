@@ -1,589 +1,403 @@
-use crate::*;
+#![allow(unused)]
+use crate::{Color, Primative, Rect, Widget};
 
-#[derive(Default, Copy, Clone, Debug, PartialEq)]
-pub enum Direction {
-    #[default]
-    Horizontal,
-    Vertical,
+#[macro_export]
+macro_rules! count_expr {
+    () => { 0 };
+    ($first:expr $(, $rest:expr)*) => {
+        1 + $crate::count_expr!($($rest),*)
+    };
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq)]
-pub enum Center {
-    #[default]
-    Horizontal,
-    Vertical,
-    Both,
+pub fn rect() -> Rectangle {
+    Rectangle::default()
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq)]
-pub enum Quadrant {
-    #[default]
-    TopLeft,
-    TopRight,
-    BottomLeft,
-    BottomRight,
+#[derive(Debug, Default, Clone)]
+pub struct Rectangle {
+    area: Rect,
+    padding: Padding,
+    color: Color,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum FlexMode {
-    Standard(Direction, Quadrant),
-    Center(Center),
-}
-
-impl Default for FlexMode {
-    fn default() -> Self {
-        Self::Standard(Direction::Horizontal, Quadrant::TopLeft)
+impl Rectangle {
+    pub fn padding(mut self, padding: (usize, usize, usize, usize)) -> Self {
+        self.padding = padding.into();
+        self
     }
+    pub fn bg(mut self, color: Color) -> Self {
+        self.color = color;
+        self
+    }
+}
+
+impl Widget for Rectangle {
+    type Layout = Self;
+
+    fn primative(&self) -> Primative {
+        Primative::Ellipse(0, self.color)
+    }
+
+    fn area(&self) -> Rect {
+        self.area
+    }
+
+    fn area_mut(&mut self) -> Option<&mut Rect> {
+        Some(&mut self.area)
+    }
+}
+
+#[derive(Default, Debug, Clone, Copy)]
+pub enum FlexDirection {
+    #[default]
+    LeftRight,
+    RightLeft,
+    TopBottom,
+    BottomTop,
+}
+
+#[derive(Default, Debug, Clone, Copy)]
+pub struct Padding {
+    pub left: usize,
+    pub top: usize,
+    pub right: usize,
+    pub bottom: usize,
+}
+
+impl From<(usize, usize, usize, usize)> for Padding {
+    fn from(value: (usize, usize, usize, usize)) -> Self {
+        Self::new(value.0, value.1, value.2, value.3)
+    }
+}
+
+impl Padding {
+    pub const fn new(left: usize, top: usize, right: usize, bottom: usize) -> Self {
+        Self {
+            left,
+            top,
+            right,
+            bottom,
+        }
+    }
+}
+
+pub fn calculate_offset(direction: FlexDirection, padding: Padding) -> usize {
+    match direction {
+        FlexDirection::LeftRight => padding.left,
+        FlexDirection::RightLeft => padding.right,
+        FlexDirection::TopBottom => padding.top,
+        FlexDirection::BottomTop => padding.bottom,
+    }
+}
+
+// Positioning Step
+// +---------------------------------+
+// | +-------------+ +-------------+ |
+// | |             | |             | |
+// | |             | |             | |
+// | |             | +-------------+ |
+// | |             |                 |
+// | +-------------+                 |
+// +------------------------+--------+
+
+//flex!(
+//    h!(rect().wh(300), rect().w(300).h(200)).gap(32)
+//).padding(32)
+
+//If no x and y values are specified start at the top left (0, 0)
+//Assuming left to right layout.
+//Start the x value at the left padding value.
+//In this case our x value is `offset = 32`
+//Our first widget is a container.
+//We need to calculate the positioning of each of the widgets.
+//The first will be at x = 32,
+//the second will be at x = 32 + widget.width + gap
+//The parent size will be padding.left + container.width + padding.right
+
+//Because of the way macros work, the flex macro will need to also do sizing
+//I can't chain together v!() and h!() without something delimiting the root node.
+//There might be a way but I've been working on this for too long it's time to LOCK IN.
+
+pub fn calculate_sizing(container: &mut Container, area: &mut Rect, direction: FlexDirection) {
+    match direction {
+        FlexDirection::LeftRight => {
+            area.width += container.area.width;
+            area.height = area.height.max(container.area.height)
+        }
+        FlexDirection::RightLeft => todo!(),
+        FlexDirection::TopBottom => todo!(),
+        FlexDirection::BottomTop => todo!(),
+    }
+}
+
+pub fn draw_call(area: Rect, primative: Primative) {
+    println!("Drawing widget({}) at {}", primative, area);
+}
+
+pub fn draw_widgets(
+    container: &mut Container,
+    direction: FlexDirection,
+    offset: &mut usize,
+    gap: usize,
+) {
+    for (area, primative) in &container.widgets {
+        let mut area = area.clone().x(*offset);
+        draw_call(area, primative.clone());
+        *offset += area.width + gap;
+    }
+}
+
+pub fn debug_draw_widgets(
+    debug: &mut Vec<(Rect, Primative)>,
+    container: &mut Container,
+    direction: FlexDirection,
+    offset: &mut usize,
+    gap: usize,
+) {
+    for (area, primative) in &container.widgets {
+        let mut area = area.x(*offset);
+        debug.push((area, primative.clone()));
+        draw_call(area, primative.clone());
+        *offset += area.width + gap;
+    }
+}
+
+
+
+#[rustfmt::skip] 
+#[macro_export]
+macro_rules! flex {
+    //Assume eveything being pass in is a container.
+    ($($container:expr),* $(,)?) => {{ 
+        let f = |direction: $crate::FlexDirection, padding: $crate::Padding, gap: usize| {
+            let mut offset = $crate::calculate_offset(direction, padding);
+            let mut area = Rect::default();
+
+            $(
+                let mut container = $container.call();
+                $crate::calculate_sizing(&mut container, &mut area, direction);
+                $crate::draw_widgets(&mut container, direction, &mut offset, gap);
+            )*
+
+            area
+        };
+        $crate::DeferFlex {
+            f,
+            direction: $crate::FlexDirection::LeftRight,
+            padding: $crate::Padding::default(),
+            gap: 0,
+        }
+    }}
+
+    // ($($widget:expr),* $(,)?) => {{
+    //     let mut x = 0;
+    //     let mut y = 0;
+    //     let mut width = 0;
+    //     let mut height = 0;
+
+    //     let direction = $crate::FlexDirection::LeftRight;
+    //     let padding = $crate::Padding::new(32, 32, 32, 32);
+    //     //Padding is just the directional padding.
+    //     let mut offset = $crate::calculate_offset(direction, padding);
+
+    //     let gap = 32;
+
+    //     $(
+    //         let w = &mut $widget;
+    //         $crate::grow(w, &mut offset, gap, direction);
+    //     )*
+    // }};
 }
 
 #[derive(Debug)]
-pub struct Segment {
-    ///Either the total height or width.
-    ///Depends on the direction.
-    pub size: usize,
-    ///Max width or max height depends on direction.
-    pub max: usize,
-    pub widget_count: usize,
-}
-
-impl Segment {
-    pub const fn new() -> Self {
-        Self {
-            size: 0,
-            max: 0,
-            widget_count: 0,
-        }
-    }
-}
-
-pub struct FlexImpl<F> {
-    pub f: Option<F>,
-}
-
-pub trait DrawFlex {
-    fn call(&mut self, layout: &mut Flex<Self>)
-    where
-        Self: Sized;
-}
-
-impl<F> DrawFlex for FlexImpl<F>
-where
-    //I changed this to be FnMut for debug purposes. I don't know what issues this might cause.
-    F: FnMut(FlexMode, usize, usize, usize, usize, usize, usize) -> Vec<(Rect, Primative)>,
-{
-    fn call(&mut self, flex: &mut Flex<Self>) {
-        if let Some(ref mut f) = self.f {
-            flex.debug = (f)(
-                flex.mode,
-                flex.viewport_width,
-                flex.viewport_height,
-                flex.area.x,
-                flex.area.y,
-                flex.margin,
-                flex.padding,
-            );
-        }
-    }
-}
-
-pub struct Flex<F: DrawFlex> {
-    pub f: Option<F>,
-    pub mode: FlexMode,
+pub struct Container {
+    pub widgets: Vec<(Rect, Primative)>,
     pub area: Rect,
-    ///Outer padding
-    pub padding: usize,
-    ///Inner padding
-    pub margin: usize,
-    pub viewport_width: usize,
-    pub viewport_height: usize,
-    pub debug: Vec<(Rect, Primative)>,
 }
 
-impl<F: DrawFlex> Flex<F> {
-    pub fn mode(mut self, mode: FlexMode) -> Self {
-        self.mode = mode;
-        self
+impl Widget for Container {
+    type Layout = Self;
+
+    fn primative(&self) -> crate::Primative {
+        todo!()
     }
 
-    pub fn area(mut self, area: Rect) -> Self {
-        self.area = area;
-        self
+    fn area(&self) -> crate::Rect {
+        self.area
     }
 
-    pub fn padding(mut self, padding: usize) -> Self {
-        self.padding = padding;
-        self
+    fn area_mut(&mut self) -> Option<&mut crate::Rect> {
+        Some(&mut self.area)
     }
 
-    pub fn margin(mut self, margin: usize) -> Self {
-        self.margin = margin;
-        self
+    fn is_container() -> bool
+    where
+        Self: Sized,
+    {
+        true
     }
 
-    //These would be inherited from the area trait.
-    pub fn wh(mut self, size: usize) -> Self {
-        self.viewport_width = size;
-        self.viewport_height = size;
-        self
-    }
-
-    pub fn width(mut self, width: usize) -> Self {
-        self.viewport_width = width;
-        self
-    }
-
-    pub fn height(mut self, height: usize) -> Self {
-        self.viewport_height = height;
-        self
-    }
-
-    pub fn vertical(mut self) -> Self {
-        self.mode = FlexMode::Standard(Direction::Vertical, Quadrant::TopLeft);
-        self
-    }
-
-    pub fn horizontal(mut self) -> Self {
-        self.mode = FlexMode::Standard(Direction::Horizontal, Quadrant::TopLeft);
-        self
+    fn as_container_slice_mut(&mut self) -> &mut [(Rect, Primative)] {
+        &mut self.widgets
     }
 }
 
-impl<F: DrawFlex> Flex<F> {
-    //TODO: Not sure how to do this better.
-    pub fn force_draw(&mut self) {
-        let mut f = self.f.take();
-        if let Some(f) = &mut f {
-            f.call(self);
-        }
-        self.f = f;
-    }
-}
+//Sizing -> Positioning -> Rendering
 
-impl<F: DrawFlex> Drop for Flex<F> {
-    fn drop(&mut self) {
-        if let Some(mut f) = self.f.take() {
-            f.call(self);
-        }
-    }
-}
+// +---------------------------------+
+// | +-------------+ +-------------+ |
+// | |             | |             | |
+// | |             | |             | |
+// | |             | +-------------+ |
+// | |             |                 |
+// | +-------------+                 |
+// +------------------------+--------+
 
-impl<F: DrawFlex> std::fmt::Debug for Flex<F> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Flex")
-            .field("f", if self.f.is_some() { &"Some" } else { &"None" })
-            .field("flex", &self.mode)
-            .field("area", &self.area)
-            .field("padding", &self.padding)
-            .field("margin", &self.margin)
-            .field("viewport_width", &self.viewport_width)
-            .field("viewport_height", &self.viewport_height)
-            .field("debug", &self.debug)
-            .finish()
-    }
-}
+//flex!(
+//    h!(rect().wh(300), rect().w(300).h(200)).gap(32)
+//).padding(32)
 
-pub fn calculate_segments<T: Widget>(
-    center: Center,
-    segments: &mut Vec<Segment>,
-    widget: &mut T,
-    count: usize,
-    viewport_width: usize,
-    viewport_height: usize,
-    mut i: usize,
-    mut widget_count: usize,
-    mut max_width: usize,
-    mut max_height: usize,
-    mut total_width: usize,
-    mut total_height: usize,
-    mut total_width_of_largest: usize,
-    mut total_height_of_largest: usize,
-) -> (usize, usize, usize, usize, usize, usize, usize, usize) {
-    let area = widget.area();
+//First let's start with the child container.
+//h!(rect().wh(300), rect().w(300).h(200)).gap(32)
+//We are not calculating position with this.
+//Instead we want to know the size of the container
+//We already know the size of each widget.
 
-    i += 1;
-    widget_count += 1;
+//For this example width = 300 + 32 + 300 = 632
+//                 height = 300
 
-    total_width += area.width;
-    total_height += area.height;
+//Now this should be passed as a widget onto the next macro.
+//I think that the widget trait will need to be reworked.
+//Widget.primative() should return &[Primative] not a single Primative.
+//This is because widgets need to be able to hold multiple other widgets.
+//We also have the Widget.is_container() function.
 
-    if area.width > max_width {
-        max_width = area.width;
-    }
-
-    if area.height > max_height {
-        max_height = area.height;
-    }
-
-    match center {
-        Center::Horizontal => {
-            if (total_width + area.width > viewport_width) || i == count {
-                segments.push(Segment {
-                    size: total_width,
-                    max: max_width,
-                    widget_count,
-                });
-
-                total_height_of_largest += max_height;
-
-                max_height = 0;
-                max_width = 0;
-
-                total_width = 0;
-                widget_count = 0;
-            }
-        }
-        Center::Vertical => {
-            if (total_height + area.height > viewport_height) || i == count {
-                segments.push(Segment {
-                    size: total_height,
-                    max: max_height,
-                    widget_count,
-                });
-
-                total_width_of_largest += max_width;
-
-                max_height = 0;
-                max_width = 0;
-
-                total_height = 0;
-                widget_count = 0;
-            }
-        }
-        Center::Both => {
-            todo!()
-        }
-    };
-
-    (
-        i,
-        widget_count,
-        max_width,
-        max_height,
-        total_width,
-        total_height,
-        total_width_of_largest,
-        total_height_of_largest,
-    )
-}
-
-pub fn draw_segments<T: Widget>(
-    widget: &mut T,
-    center: Center,
-    segments: &[Segment],
-    mut widget_index: usize,
-    mut segment_index: usize,
-    mut x: usize,
-    mut y: usize,
-    viewport_width: usize,
-    viewport_height: usize,
-    mut spacing: usize,
-    vspacing: usize,
-    hspacing: usize,
-    temp: &mut Vec<(Rect, Primative)>,
-) -> (usize, usize, usize, usize, usize) {
-    let mut segment = &segments[segment_index];
-
-    if widget_index >= segment.widget_count {
-        widget_index = 0;
-        segment_index += 1;
-        segment = &segments[segment_index];
-
-        match center {
-            Center::Horizontal => {
-                spacing = viewport_width.saturating_sub(segment.size) / (segment.widget_count + 1);
-                x = spacing;
-                y += segment.max + vspacing;
-            }
-            Center::Vertical => {
-                spacing = viewport_height.saturating_sub(segment.size) / (segment.widget_count + 1);
-                x += segment.max + hspacing;
-                y = spacing;
-            }
-            Center::Both => todo!(),
-        };
-    }
-
-    let area = widget.area_mut().unwrap();
-
-    area.x = x;
-    area.y = y;
-
-    //Stop the mutable borrow.
-    let area = widget.area();
-
-    //Click the widget once the layout is calculated.
-    widget.try_click();
-
-    //This is where the draw call would typically be issued.
-    temp.push((area, widget.primative()));
-
-    match center {
-        Center::Horizontal => x += spacing + area.width,
-        Center::Vertical => y += spacing + area.height,
-        Center::Both => todo!(),
-    };
-
-    widget_index += 1;
-
-    (widget_index, segment_index, x, y, spacing)
-}
-
-pub fn flex_xy(
-    start: Quadrant,
-    viewport_width: usize,
-    viewport_height: usize,
-    x: usize,
-    y: usize,
-) -> (usize, usize) {
-    match start {
-        Quadrant::TopLeft => (x, y),
-        Quadrant::TopRight => (viewport_width - x, y),
-        Quadrant::BottomLeft => (x, viewport_height - y),
-        Quadrant::BottomRight => (viewport_width - x, viewport_height - y),
-    }
-}
-
-pub fn flex_standard<T: Widget>(
-    direction: Direction,
-    quadrant: Quadrant,
-    widget: &mut T,
-    mut x: usize,
-    mut y: usize,
-    start_x: usize,
-    start_y: usize,
-    mut max_width: usize,
-    mut max_height: usize,
-    viewport_width: usize,
-    viewport_height: usize,
-    temp: &mut Vec<(Rect, Primative)>,
-) -> (usize, usize, usize, usize) {
-    let area = widget.area_mut().unwrap();
-
-    //TODO: The code inside horizontal and vertical should be flipped.
-    match direction {
-        Direction::Horizontal => {
-            if match quadrant {
-                Quadrant::TopLeft => (x + area.width) >= viewport_width,
-                Quadrant::TopRight => x.checked_sub(area.width).is_none(),
-                _ => false,
-            } {
-                x = start_x;
-                y += max_height;
-                max_height = 0;
-            }
-
-            if match quadrant {
-                Quadrant::BottomLeft => (x + area.width) >= viewport_width,
-                Quadrant::BottomRight => x.checked_sub(area.width).is_none(),
-                _ => false,
-            } {
-                x = start_x;
-                y -= max_height;
-                max_height = 0;
-            }
-        }
-        Direction::Vertical => {
-            if match quadrant {
-                Quadrant::TopLeft => (y + area.height) >= viewport_height,
-                Quadrant::BottomLeft => y.checked_sub(area.height).is_none(),
-                _ => false,
-            } {
-                y = start_y;
-                x += max_width;
-                max_width = 0;
-            }
-
-            if match quadrant {
-                Quadrant::TopRight => (y + area.height) >= viewport_height,
-                Quadrant::BottomRight => y.checked_sub(area.height).is_none(),
-                _ => false,
-            } {
-                y = start_y;
-                x -= max_width;
-                max_width = 0;
-            }
-        }
-    }
-
-    if area.height > max_height {
-        max_height = area.height;
-    }
-
-    if area.width > max_width {
-        max_width = area.width;
-    }
-
-    area.x = x;
-    area.y = y;
-
-    //Stop the mutable borrow.
-    let area = widget.area();
-
-    //Click the widget once the layout is calculated.
-    widget.try_click();
-
-    //This is where the draw call would typically be issued.
-    temp.push((area, widget.primative()));
-
-    match direction {
-        Direction::Horizontal => {
-            match quadrant {
-                Quadrant::TopLeft | Quadrant::BottomLeft => x += area.width,
-                Quadrant::TopRight | Quadrant::BottomRight => x -= area.width,
-            };
-        }
-        Direction::Vertical => {
-            match quadrant {
-                Quadrant::TopLeft | Quadrant::TopRight => y += area.height,
-                Quadrant::BottomLeft | Quadrant::BottomRight => y -= area.height,
-            };
-        }
-    }
-
-    (x, y, max_width, max_height)
-}
-
+//Size the elements first and then set the positions later.
 #[macro_export]
 macro_rules! h {
     ($($widget:expr),* $(,)?) => {{
-        flex!($($widget),*).mode(FlexMode::Standard(Direction::Horizontal, Quadrant::TopLeft))
-    }};
-}
+        //TODO: Padding is unused here.
+        let f = |padding: Padding, gap: usize| {
+            let count = $crate::count_expr!($($widget),*);
+            let gap = (count - 1) * gap;
 
-#[macro_export]
-macro_rules! v {
-    ($($widget:expr),* $(,)?) => {
-        flex!($($widget),*).mode(FlexMode::Standard(Direction::Vertical, Quadrant::TopLeft))
-    };
-}
+            let mut width = gap;
+            let mut height = 0;
 
-#[macro_export]
-macro_rules! flex {
-    ($($widget:expr),* $(,)?) => {{
-        //TODO: This should also return the flex area alongside all of the widgets.
-        let f = |flex: FlexMode, viewport_width: usize, viewport_height: usize, x: usize, y: usize, _margin: usize, _padding: usize| -> Vec<(Rect, Primative)> {
-            let mut temp = Vec::new();
+            let mut widgets = Vec::new();
 
-            //TODO: Combine standard and center to reduce the number of loops
-            //There is currently a lot of junk in error messages for example
-            //flex!(&mut &mut header()) will spit out a bunch of junk.
-            match flex {
-                FlexMode::Standard(direction, quadrant) => {
-                    //Could pack all of this into a struct. It might be faster.
-                    //Might check later.
-                    let (x, y) = flex_xy(quadrant, viewport_width, viewport_height, x, y);
-                    let start_x = x;
-                    let start_y = y;
-                    let max_height = 0;
-                    let max_width = 0;
+            $(
+                let w = &mut $widget;
+                let area = w.area();
+                height = area.height.max(height);
+                width += area.width;
+                widgets.push((area, w.primative()));
+            )*
 
-                    $(
-                        let w = &mut $widget;
-                        // let w = widget(t);
-                        #[allow(unused)]
-                        let (x, y, max_width, max_height) = flex_standard(direction,quadrant, w, x, y, start_x, start_y, max_height, max_width, viewport_width, viewport_height, &mut temp);
-                    )*
-                }
-                FlexMode::Center(center) => {
-                    let mut segments: Vec<Segment> = Vec::new();
-
-                    let total_width = 0;
-                    let total_height = 0;
-                    let max_width = 0;
-                    let max_height = 0;
-                    //The total height of largest widget in each segment.
-                    let total_height_of_largest = 0;
-                    let total_width_of_largest = 0;
-                    let i = 0;
-                    let widget_count = 0;
-
-                    const COUNT: usize = const { count_expr!($($widget),*) };
-
-                    //The first loop is required to calculate the segments.
-                    $(
-                        let w = &mut $widget;
-                        // let w = widget(t);
-
-                        #[allow(unused)]
-                        let (i, widget_count, max_width, max_height, total_width, total_height, total_width_of_largest, total_height_of_largest) = calculate_segments(
-                            center,
-                            &mut segments,
-                            w,
-                            COUNT,
-                            viewport_width,
-                            viewport_height,
-                            i,
-                            widget_count,
-                            max_width,
-                            max_height,
-                            total_width,
-                            total_height,
-                            total_width_of_largest,
-                            total_height_of_largest,
-                        );
-                    )*
-
-                    //This is named poorly, I honestly can't even remember what this is for...
-                    let vspacing = viewport_height.saturating_sub(total_height_of_largest) / segments.len();
-                    let hspacing = viewport_width.saturating_sub(total_width_of_largest) / segments.len();
-
-                    //Spacing is really the segment spacing.
-                    let (x, y, spacing) = match center {
-                        Center::Horizontal => {
-                            let spacing = viewport_width.saturating_sub(segments[0].size) / (segments[0].widget_count + 1);
-                            (spacing, 0, spacing)
-                        },
-                        Center::Vertical => {
-                            let spacing = viewport_height.saturating_sub(segments[0].size) / (segments[0].widget_count + 1);
-                            (0, spacing, spacing)
-                        },
-                        Center::Both => {
-                            let x = viewport_width.saturating_sub(segments[0].size) / (segments[0].widget_count + 1);
-                            let y = viewport_height.saturating_sub(segments[0].size) / (segments[0].widget_count + 1);
-                            //I think I'll need to keep both types of segment spacing.
-                            (x, y, 0)
-                        },
-                    };
-
-                    let widget_index = 0;
-                    let segment_index = 0;
-
-                    $(
-                        let w = &mut $widget;
-                        // let w = widget(t);
-
-                        #[allow(unused)]
-                        let (widget_index, segment_index, x, y, spacing) = draw_segments(
-                            w,
-                            center,
-                            &segments,
-                            widget_index,
-                            segment_index,
-                            x,
-                            y,
-                            viewport_width,
-                            viewport_height,
-                            spacing,
-                            vspacing,
-                            hspacing,
-                            &mut temp,
-                        );
-                    )*
-                }
-            }
-
-            temp
+            Container { widgets, area: Rect::new(0, 0, width, height) }
         };
 
-        $crate::Flex {
-            f: Some(FlexImpl { f: Some(f) }),
-            mode: FlexMode::default(),
-            area: Rect::default(),
-            padding: 0,
-            margin: 0,
-            viewport_width: 0,
-            viewport_height: 0,
-            debug: Vec::new(),
+        //Defer the creation of the container so that the builder pattern
+        //can be used to modifiy aspects of the container such as gap and padding.
+        $crate::DeferContainer {
+            f,
+            padding: Padding::default(),
+            gap: 0,
         }
     }};
+}
+
+//Maybe group into one struct????
+//Could also convert into widget to simplify calling code.
+pub struct DeferFlex<F> {
+    pub f: F,
+    pub direction: FlexDirection,
+    pub padding: Padding,
+    pub gap: usize,
+}
+
+impl<F> DeferFlex<F> {
+    pub fn gap(mut self, gap: usize) -> Self {
+        self.gap = gap;
+        self
+    }
+    //TODO: Padding left, right, etc.
+    pub fn padding(mut self, padding: usize) -> Self {
+        self.padding = Padding::new(padding, padding, padding, padding);
+        self
+    }
+    pub fn direction(mut self, direction: FlexDirection) -> Self {
+        self.direction = direction;
+        self
+    }
+}
+
+impl<F> Defer for DeferFlex<F>
+where
+    F: Fn(FlexDirection, Padding, usize) -> Rect,
+{
+    type T = Rect;
+    fn call(&self) -> Self::T {
+        (self.f)(self.direction, self.padding, self.gap)
+    }
+}
+
+pub struct DeferContainer<F> {
+    pub f: F,
+    pub padding: Padding,
+    pub gap: usize,
+}
+
+impl<F> DeferContainer<F> {
+    pub fn gap(mut self, gap: usize) -> Self {
+        self.gap = gap;
+        self
+    }
+    pub fn padding(mut self, padding: usize) -> Self {
+        self.padding = Padding::new(padding, padding, padding, padding);
+        self
+    }
+}
+impl<F> Defer for DeferContainer<F>
+where
+    F: Fn(Padding, usize) -> Container,
+{
+    type T = Container;
+    fn call(&self) -> Self::T {
+        (self.f)(self.padding, self.gap)
+    }
+}
+
+pub trait Defer {
+    type T;
+    fn call(&self) -> Self::T;
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::*;
+
+    #[test]
+    fn basic_two_rect() {
+        let mut container = h!(rect().wh(300), rect().w(300).h(200)).gap(32).call();
+        assert!(container.area.width == 632);
+        assert!(container.area.height == 300);
+        assert!(container.widgets.len() == 2);
+
+        let gap = 32;
+        let mut offset = gap;
+        let mut debug = Vec::new();
+        debug_draw_widgets(&mut debug, &mut container, FlexDirection::LeftRight, &mut offset, gap);
+
+        assert!(debug[0].0.x == 32);
+        assert!(debug[1].0.x == 32 + 300 + 32);
+
+        let flex = flex!(h!(rect().wh(300), rect().w(300).h(200)).gap(32))
+            .padding(32)
+            .gap(32)
+            .call();
+
+        assert!(flex.width == 632);
+        assert!(flex.height == 300);
+    }
 }
