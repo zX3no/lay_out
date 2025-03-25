@@ -162,8 +162,6 @@ pub fn debug_draw_widgets(
     }
 }
 
-
-
 #[rustfmt::skip] 
 #[macro_export]
 macro_rules! flex {
